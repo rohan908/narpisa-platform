@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Haib Copper PEA",
+    "source_url": "https://documents.example.org/haib-copper-pea.pdf",
+    "attribution": "Public mining project technical report",
+    "notes": "Reference fixture for source registration flows."
+  },
+  {
+    "title": "Lofdal Rare Earths Study",
+    "source_url": "https://documents.example.org/lofdal-rare-earths-study.pdf",
+    "attribution": "Public feasibility study",
+    "notes": "Useful for parser and dashboard smoke tests."
+  }
+]

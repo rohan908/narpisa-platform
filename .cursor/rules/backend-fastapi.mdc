@@ -1,0 +1,14 @@
+---
+description: FastAPI worker rules for transient PDF parsing
+globs: apps/backend/**/*.py
+alwaysApply: false
+---
+
+# Backend Rules
+
+- Keep the worker stateless and optimized for transient source fetches.
+- Validate source domains, MIME types, and file size before parsing remote documents.
+- Do not persist PDF binaries to disk or Supabase storage.
+- Separate API routes, parsing services, and config models so they remain testable.
+- Add or update `pytest` coverage for API contracts and parser behavior.
+- Keep responses source-aware: include attribution, hashes, and job metadata where useful.

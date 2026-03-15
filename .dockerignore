@@ -1,0 +1,9 @@
+.git
+.next
+.venv
+coverage
+node_modules
+playwright-report
+test-results
+**/node_modules
+**/.next

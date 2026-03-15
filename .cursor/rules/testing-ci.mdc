@@ -1,0 +1,13 @@
+---
+description: Testing and CI expectations
+globs: "{apps/backend/tests/**/*.py,apps/web/**/*.test.tsx,apps/web/tests/**/*.ts,.github/workflows/*.yml}"
+alwaysApply: false
+---
+
+# Testing And CI
+
+- Prefer deterministic tests that use fixtures, mocks, or checked-in sample documents instead of live third-party dependencies.
+- Keep GitHub Actions fast and readable with explicit setup, cache, and validation steps.
+- When contracts change, update both app tests and workflow expectations.
+- Do not weaken CI by skipping lint, typecheck, or test gates without explicit approval.
+- Document any new env vars or external services required by CI.

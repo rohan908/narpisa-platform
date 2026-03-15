@@ -1,0 +1,14 @@
+---
+description: Next.js and Tailwind rules for the web app
+globs: apps/web/**/*
+alwaysApply: false
+---
+
+# Frontend Rules
+
+- Use App Router conventions and keep route components lean.
+- Prefer shared UI and typed contracts from `packages/ui`, `packages/config`, and `packages/types`.
+- Validate public env vars before creating Supabase clients.
+- Favor accessible semantic HTML, clear loading states, and readable Tailwind class groups.
+- Add or update Vitest tests for component and contract changes.
+- Keep Vercel compatibility in mind: no server-only code in client bundles.
