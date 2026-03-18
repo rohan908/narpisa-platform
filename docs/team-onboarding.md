@@ -137,15 +137,6 @@ Work here when you are changing:
 - backend tests
 - worker config and environment handling
 
-### `packages/config`
-
-Shared project constants and configuration defaults.
-
-Put code here when:
-
-- multiple parts of the repo need the same constant or project metadata
-- you want shared non-UI config used by the frontend and/or docs
-
 ### `packages/types`
 
 Shared TypeScript contracts and schemas.

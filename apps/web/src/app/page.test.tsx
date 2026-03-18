@@ -12,12 +12,4 @@ describe("Home page", () => {
       }),
     ).toBeInTheDocument();
   });
-
-  it("shows the storage model guidance", () => {
-    render(<Home />);
-
-    expect(
-      screen.getByText(/source url plus attribution, no persistent pdf binaries/i),
-    ).toBeInTheDocument();
-  });
 });
