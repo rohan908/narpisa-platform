@@ -1,7 +1,7 @@
 from functools import lru_cache
 from urllib.parse import urlparse
 
-from pydantic import Field, computed_field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,7 +20,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @computed_field  # type: ignore[prop-decorator]
     @property
     def allowed_domains(self) -> list[str]:
         raw_values = [
