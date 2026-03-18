@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { afterEach, vi } from "vitest";
 
 import DataInputPage from "./page";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("Data input page", () => {
   it("renders the page heading and home link", () => {
@@ -20,7 +26,7 @@ describe("Data input page", () => {
     ).toHaveAttribute("href", "/");
   });
 
-  it("shows a warning for an invalid url and disables submission", async () => {
+  it("blocks submission for an invalid payload", async () => {
     const user = userEvent.setup();
 
     render(<DataInputPage />);
@@ -33,33 +39,61 @@ describe("Data input page", () => {
       screen.getByRole("textbox", { name: /pdf source url/i }),
       "not-a-valid-url",
     );
+    await user.type(
+      screen.getByRole("textbox", { name: /attribution/i }),
+      "NaRPISA research team",
+    );
 
     expect(
-      screen.getByText(/enter a valid `http` or `https` url before adding the link/i),
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole("button", {
-        name: /add test link/i,
+        name: /queue source link/i,
       }),
     ).toBeDisabled();
   });
 
-  it("adds a valid link and resets the form", async () => {
+  it("queues a valid link and resets the form", async () => {
     const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "queued-link-1",
+        title: "Haib Copper PEA",
+        source_url: "https://example.org/report.pdf",
+        attribution: "NaRPISA research team",
+      }),
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<DataInputPage />);
 
     const titleInput = screen.getByRole("textbox", { name: /document title/i });
     const urlInput = screen.getByRole("textbox", { name: /pdf source url/i });
-    const addButton = screen.getByRole("button", { name: /add test link/i });
+    const attributionInput = screen.getByRole("textbox", { name: /attribution/i });
+    const addButton = screen.getByRole("button", { name: /queue source link/i });
 
     await user.type(titleInput, "Haib Copper PEA");
     await user.type(urlInput, "https://example.org/report.pdf");
+    await user.type(attributionInput, "NaRPISA research team");
     await user.click(addButton);
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/queue-source",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
     expect(screen.getByText("Haib Copper PEA")).toBeInTheDocument();
-    expect(screen.getByText("https://example.org/report.pdf")).toBeInTheDocument();
+    expect(
+      screen.getByText(/https:\/\/example\.org\/report\.pdf \| NaRPISA research team/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/source link queued successfully/i)).toBeInTheDocument();
     expect(titleInput).toHaveValue("");
     expect(urlInput).toHaveValue("");
+    expect(attributionInput).toHaveValue("");
   });
 });
