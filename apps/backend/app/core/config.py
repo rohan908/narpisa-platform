@@ -8,12 +8,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def _resolve_env_file() -> Path:
     current_file = Path(__file__).resolve()
-
-    for parent in current_file.parents: #search upward for the monorepo root via turbo.json when running locally
+    # search upward for the monorepo root
+    # via turbo.json when running locally
+    for parent in current_file.parents:
         if (parent / "turbo.json").exists():
             return parent / ".env"
- 
-    for parent in current_file.parents: # fall back to the backend app root via pyproject.toml inside Docker/Render
+    # fall back to the backend app root
+    # via pyproject.toml inside Docker/Render
+    for parent in current_file.parents:
         if (parent / "pyproject.toml").exists():
             return parent / ".env"
 
