@@ -83,25 +83,47 @@ class JobStore:
         row = rows[0]
         return self._map_job(row["document"], row)
 
-    async def list_jobs(self) -> list[QueuedSourceDocument]:
+    async def list_jobs(
+        self,
+        *,
+        statuses: list[str] | None = None,
+    ) -> list[QueuedSourceDocument]:
+        params: dict[str, str] = {
+            "select": (
+                "id,status,source_http_status,page_count,error_message,"
+                "started_at,completed_at,created_at,updated_at,"
+                "document:documents("
+                "id,title,source_url,source_domain,attribution,notes,"
+                "mime_type,content_hash,last_http_status,created_at,updated_at)"
+            ),
+            "order": "created_at.desc",
+        }
+        if statuses:
+            params["status"] = f"in.({','.join(statuses)})"
+
         async with self._get_client() as client:
             response = await client.get(
                 "/processing_jobs",
-                params={
-                    "select": (
-                        "id,status,source_http_status,page_count,error_message,"
-                        "started_at,completed_at,created_at,updated_at,"
-                        "document:documents("
-                        "id,title,source_url,source_domain,attribution,notes,"
-                        "mime_type,content_hash,last_http_status,created_at,updated_at)"
-                    ),
-                    "order": "created_at.desc",
-                },
+                params=params,
             )
             response.raise_for_status()
             rows = response.json()
 
         return [self._map_job(row["document"], row) for row in rows]
+
+    async def delete_job(self, job_id: str) -> bool:
+        job = await self.get_job(job_id)
+        if job is None:
+            return False
+
+        async with self._get_client() as client:
+            document_delete_response = await client.delete(
+                "/documents",
+                params={"id": f"eq.{job.document_id}"},
+            )
+            document_delete_response.raise_for_status()
+
+        return True
 
     async def mark_fetching(self, job_id: str) -> None:
         now = datetime.now(UTC).isoformat()

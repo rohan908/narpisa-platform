@@ -67,7 +67,8 @@ class QueuedDocumentProcessor:
                 error_message=str(error) or "Unexpected processing failure.",
             )
         finally:
-            self._cleanup_download(download_path)
+            if not settings.keep_downloaded_pdfs:
+                self._cleanup_download(download_path)
 
     def _build_parse_request(
         self,

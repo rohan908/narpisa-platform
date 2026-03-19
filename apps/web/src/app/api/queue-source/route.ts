@@ -23,13 +23,17 @@ type BackendQueuedSourceDocument = {
   updated_at?: string | null;
 };
 
-async function forwardQueueRequest(init?: RequestInit) {
+async function forwardQueueRequest(init?: RequestInit, path = "") {
   try {
     const pdfWorkerUrl = getPdfWorkerUrl();
-    const backendResponse = await fetch(`${pdfWorkerUrl}/api/v1/queue-source`, {
+    const backendResponse = await fetch(`${pdfWorkerUrl}/api/v1/queue-source${path}`, {
       cache: "no-store",
       ...init,
     });
+
+    if (backendResponse.status === 204) {
+      return new NextResponse(null, { status: 204 });
+    }
 
     const responseBody = normalizeQueueResponse(await backendResponse.json());
 
@@ -46,6 +50,27 @@ async function forwardQueueRequest(init?: RequestInit) {
 
 export async function GET() {
   return forwardQueueRequest();
+}
+
+export async function DELETE(request: Request) {
+  const url = new URL(request.url);
+  const jobId = url.searchParams.get("jobId");
+
+  if (!jobId) {
+    return NextResponse.json(
+      {
+        detail: "Missing queued job id.",
+      },
+      { status: 400 },
+    );
+  }
+
+  return forwardQueueRequest(
+    {
+      method: "DELETE",
+    },
+    `/${jobId}`,
+  );
 }
 
 export async function POST(request: Request) {

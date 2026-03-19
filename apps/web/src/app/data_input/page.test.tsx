@@ -187,4 +187,58 @@ describe("Data input page", () => {
     expect(await screen.findByText(/fetching pdf/i)).toBeInTheDocument();
     expect(screen.getByText("Haib Copper PEA")).toBeInTheDocument();
   });
+
+  it("deletes a queued link from the frontend list", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            id: "7b38d7f8-7ff9-4d6c-8b8c-4db0bda7cb8a",
+            documentId: "1b5ed2b0-6f06-4f09-8de8-4d8456ef7d01",
+            title: "Haib Copper PEA",
+            sourceUrl: "https://example.org/report.pdf",
+            sourceDomain: "example.org",
+            attribution: "NaRPISA research team",
+            notes: null,
+            mimeType: "application/pdf",
+            status: "queued",
+            contentHash: null,
+            pageCount: null,
+            sourceHttpStatus: null,
+            errorMessage: null,
+            queuedAt: "2026-03-15T12:00:00+00:00",
+            startedAt: null,
+            completedAt: null,
+            updatedAt: "2026-03-15T12:00:00+00:00",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: async () => null,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DataInputPage />);
+
+    await user.click(await screen.findByLabelText(/delete haib copper pea/i));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/queue-source?jobId=7b38d7f8-7ff9-4d6c-8b8c-4db0bda7cb8a",
+      expect.objectContaining({
+        method: "DELETE",
+      }),
+    );
+    expect(await screen.findByText(/queued source deleted/i)).toBeInTheDocument();
+    expect(screen.getByText(/no queued links yet/i)).toBeInTheDocument();
+  });
 });

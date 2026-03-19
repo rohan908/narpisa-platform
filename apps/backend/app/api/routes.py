@@ -63,6 +63,20 @@ async def list_queued_sources() -> list[QueuedSourceDocument]:
     return await document_queue.list_items()
 
 
+@router.delete(
+    "/queue-source/{job_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["processing"],
+)
+async def delete_queued_source(job_id: str) -> None:
+    deleted = await document_queue.delete_item(job_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Queued source not found.",
+        )
+
+
 def _cleanup_download(download_path: Path) -> None:
     if download_path.exists():
         download_path.unlink()

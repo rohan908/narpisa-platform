@@ -29,12 +29,6 @@ class SourceFetcher:
         self._client = client
 
     async def fetch_pdf(self, source_url: str, destination_path: Path) -> FetchResult:
-        if not self.settings.is_domain_allowed(source_url):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Source domain is not in the allowlist.",
-            )
-
         timeout = httpx.Timeout(self.settings.fetch_timeout_seconds)
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         hasher = sha256()

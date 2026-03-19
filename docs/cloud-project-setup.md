@@ -112,7 +112,6 @@ Use the `render.yaml` file in the repo root.
 
 Set these in both Render backend services:
 
-- `PDF_WORKER_FETCH_ALLOWED_DOMAINS`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
@@ -132,8 +131,8 @@ Copy `.env.example` to `.env` and fill in:
 - Supabase URL
 - Supabase anon key
 - Supabase service role key
-- Allowed PDF source domains
 - `CELERY_BROKER_URL` if you are not using the Docker Compose Redis service
+- Optional: `KEEP_DOWNLOADED_PDFS=true` when you want local worker runs to retain downloaded PDFs for inspection
 
 ### GitHub Actions secrets
 

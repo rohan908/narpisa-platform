@@ -26,6 +26,7 @@ Monorepo starter for the NaRPISA natural resources value-addition prototype.
 5. Start Redis for the Celery broker:
   - Docker: `docker compose up redis -d`
   - Local Redis: use `redis://localhost:6379/0`
+  - Optional local debugging: set `KEEP_DOWNLOADED_PDFS=true` in `.env` to retain fetched PDFs after processing
 6. Run the apps:
   - Web: `pnpm dev:web`
   - Backend API:

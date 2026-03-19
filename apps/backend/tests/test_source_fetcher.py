@@ -54,7 +54,6 @@ class FakeAsyncClient:
 @pytest.mark.asyncio
 async def test_fetch_pdf_streams_file_to_disk(tmp_path: Path) -> None:
     settings = Settings(
-        fetch_allowed_domains="documents.example.org",
         supabase_url="https://example.supabase.co",
         supabase_service_role_key="test-service-role-key",
     )
@@ -81,7 +80,6 @@ async def test_fetch_pdf_streams_file_to_disk(tmp_path: Path) -> None:
 async def test_fetch_pdf_rejects_oversized_files(tmp_path: Path) -> None:
     settings = Settings(
         fetch_max_bytes=4,
-        fetch_allowed_domains="documents.example.org",
         supabase_url="https://example.supabase.co",
         supabase_service_role_key="test-service-role-key",
     )

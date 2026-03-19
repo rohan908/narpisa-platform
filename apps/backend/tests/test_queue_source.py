@@ -75,6 +75,21 @@ async def test_list_queued_sources_returns_enqueued_documents(monkeypatch) -> No
     assert body[0]["title"] == "Queued Source"
 
 
+async def test_delete_queued_source_returns_no_content(monkeypatch) -> None:
+    async def fake_delete_item(self: DocumentQueue, job_id: str) -> bool:
+        return job_id == "job-123"
+
+    monkeypatch.setattr(DocumentQueue, "delete_item", fake_delete_item)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.delete("/api/v1/queue-source/job-123")
+
+    assert response.status_code == 204
+
+
 async def test_queue_source_rejects_non_pdf_urls() -> None:
     payload = {
         "title": "Not a PDF",

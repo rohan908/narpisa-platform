@@ -7,12 +7,14 @@ import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Container from "@mui/material/Container";
 import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import Link from "next/link";
 
 import {
@@ -31,6 +33,8 @@ export default function DataInputPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingLinks, setIsLoadingLinks] = useState(true);
+  const [isRefreshingLinks, setIsRefreshingLinks] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
 
   const draftPayload = createSourceDocumentInputSchema.safeParse({
     title,
@@ -39,8 +43,14 @@ export default function DataInputPage() {
   });
   const canAdd = draftPayload.success && !isSubmitting;
 
-  const loadQueuedLinks = useCallback(async () => {
-    setIsLoadingLinks(true);
+  const loadQueuedLinks = useCallback(async (options?: { background?: boolean }) => {
+    const isBackgroundRefresh = options?.background ?? false;
+
+    if (isBackgroundRefresh) {
+      setIsRefreshingLinks(true);
+    } else {
+      setIsLoadingLinks(true);
+    }
 
     try {
       const response = await fetch("/api/queue-source", {
@@ -68,7 +78,11 @@ export default function DataInputPage() {
           : "Unable to load queued source links right now.",
       );
     } finally {
-      setIsLoadingLinks(false);
+      if (isBackgroundRefresh) {
+        setIsRefreshingLinks(false);
+      } else {
+        setIsLoadingLinks(false);
+      }
     }
   }, []);
 
@@ -85,7 +99,11 @@ export default function DataInputPage() {
     }
 
     const pollingTimer = window.setInterval(() => {
-      void loadQueuedLinks();
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      void loadQueuedLinks({ background: true });
     }, 3000);
 
     return () => {
@@ -145,6 +163,34 @@ export default function DataInputPage() {
     }
   }
 
+  async function handleDeleteLink(jobId: string) {
+    setDeletingJobId(jobId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/queue-source?jobId=${encodeURIComponent(jobId)}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json()) as { detail?: string };
+        throw new Error(errorBody.detail ?? "Unable to delete queued source.");
+      }
+
+      await loadQueuedLinks();
+      setSuccessMessage("Queued source deleted.");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete queued source right now.",
+      );
+    } finally {
+      setDeletingJobId(null);
+    }
+  }
+
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
       <Stack spacing={3}>
@@ -200,6 +246,11 @@ export default function DataInputPage() {
           <Typography variant="h6" gutterBottom>
             Queued links
           </Typography>
+          {isRefreshingLinks ? (
+            <Typography color="text.secondary" variant="body2">
+              Refreshing queue status...
+            </Typography>
+          ) : null}
           {isLoadingLinks ? (
             <Typography color="text.secondary">Loading queued links...</Typography>
           ) : links.length === 0 ? (
@@ -222,6 +273,16 @@ export default function DataInputPage() {
                     />
                     {link.status === "fetching" || link.status === "parsing" ? (
                       <CircularProgress size={18} />
+                    ) : null}
+                    {canDeleteJob(link.status) ? (
+                      <IconButton
+                        aria-label={`Delete ${link.title}`}
+                        disabled={deletingJobId === link.id}
+                        onClick={() => void handleDeleteLink(link.id)}
+                        size="small"
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
                     ) : null}
                     {link.errorMessage ? (
                       <Typography color="error" variant="body2">
@@ -266,4 +327,8 @@ function getStatusLabel(status: ProcessingJobStatus) {
     case "failed":
       return "Failed";
   }
+}
+
+function canDeleteJob(status: ProcessingJobStatus) {
+  return status === "queued" || status === "completed" || status === "failed";
 }
