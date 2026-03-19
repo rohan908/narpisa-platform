@@ -33,8 +33,7 @@ class Settings(BaseSettings):
         validation_alias="SUPABASE_URL",
     )
     supabase_service_role_key: str = Field(
-        default="test-service-role-key",
-        validation_alias="SUPABASE_SERVICE_ROLE_KEY"
+        default="test-service-role-key", validation_alias="SUPABASE_SERVICE_ROLE_KEY"
     )
     supabase_schema: str = Field(default="public", validation_alias="SUPABASE_SCHEMA")
 

@@ -68,9 +68,11 @@ pnpm --filter @narpisa/web typecheck
 ```
 ### Full repo validation
 ```
+pnpm check:backend
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm check
 ```
 
 ## Docker

@@ -513,6 +513,7 @@ pnpm --filter @narpisa/web lint
 pnpm --filter @narpisa/web typecheck
 pnpm --filter @narpisa/web test
 pnpm --filter @narpisa/web test:e2e
+pnpm check:backend
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -529,6 +530,7 @@ What these do:
 - `pnpm --filter @narpisa/web typecheck`: checks frontend TypeScript types
 - `pnpm --filter @narpisa/web test`: runs frontend unit tests
 - `pnpm --filter @narpisa/web test:e2e`: runs Playwright browser tests
+- `pnpm check:backend`: runs backend lint, Black formatting check, mypy, and pytest using the same script entry points as CI
 - `pnpm lint`: runs linting across the monorepo
 - `pnpm typecheck`: runs type checks across the monorepo
 - `pnpm test`: runs tests across the monorepo

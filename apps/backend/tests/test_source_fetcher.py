@@ -59,9 +59,7 @@ async def test_fetch_pdf_streams_file_to_disk(tmp_path: Path) -> None:
     )
     fetcher = SourceFetcher(
         settings=settings,
-        client=FakeAsyncClient(
-            FakeStreamResponse(chunks=[b"%PDF-", b"sample-bytes"])
-        ),
+        client=FakeAsyncClient(FakeStreamResponse(chunks=[b"%PDF-", b"sample-bytes"])),
     )
 
     download_path = tmp_path / "sample.pdf"
@@ -85,9 +83,7 @@ async def test_fetch_pdf_rejects_oversized_files(tmp_path: Path) -> None:
     )
     fetcher = SourceFetcher(
         settings=settings,
-        client=FakeAsyncClient(
-            FakeStreamResponse(chunks=[b"%PDF", b"-too-big"])
-        ),
+        client=FakeAsyncClient(FakeStreamResponse(chunks=[b"%PDF", b"-too-big"])),
     )
 
     download_path = tmp_path / "sample.pdf"
