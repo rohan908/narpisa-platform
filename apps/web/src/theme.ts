@@ -156,7 +156,7 @@ const theme = createTheme({
     button: {
       textTransform: "none",
       fontWeight: 400,
-      fontSize: "3rem",
+      fontSize: "2rem",
     },
   },
 });

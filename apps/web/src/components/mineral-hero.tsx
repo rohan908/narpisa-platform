@@ -1,0 +1,242 @@
+"use client";
+
+import { useRef } from "react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Stack from "@mui/material/Stack";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+} from "motion/react";
+
+import FloatingRock from "./floating-rock";
+import GlassLabel from "./glass-label";
+
+const ROCKS = {
+  rutile: {
+    src: "/minerals/rutile.png",
+    alt: "Rutile mineral specimen",
+    name: "Rutile",
+    location: "Gamsberg area, Windhoek Rural, Khomas Region, Namibia",
+  },
+  cuprotungstite: {
+    src: "/minerals/cuprotunstite.png",
+    alt: "Cuprotungstite mineral specimen",
+    name: "Cuprotungstite",
+    location: "Gamsberg area, Windhoek Rural, Khomas Region, Namibia",
+  },
+  titanite: {
+    src: "/minerals/titanite.png",
+    alt: "Titanite mineral specimen",
+    name: "Titanite",
+    location: "",
+  },
+};
+
+const locationLabelSx = {
+  //fontSize: { xs: "1.2rem", md: "3rem" },
+  //lineHeight: { xs: 1.35, md: "50px" },
+  maxWidth: { xs: 240, md: 380 },
+  whiteSpace: "normal" as const,
+  //px: "1em",
+  py: "0.6em",
+};
+
+const rutileLocationLabelSx = {
+  ...locationLabelSx,
+  textAlign: "right" as const,
+};
+
+const cuproLocationLabelSx = {
+  ...locationLabelSx,
+  textAlign: "left" as const,
+};
+
+export default function MineralHero() {
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+
+  const springConfig = { stiffness: 60, damping: 25 };
+
+  const titleY = useSpring(
+    useTransform(scrollYProgress, [0, 1], [0, 120]),
+    springConfig,
+  );
+  const titleOpacity = useSpring(
+    useTransform(scrollYProgress, [0, 0.5], [1, 0]),
+    springConfig,
+  );
+
+  return (
+    <Box
+      ref={sectionRef}
+      sx={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        minHeight: 0,
+        overflow: "hidden",
+        bgcolor: "background.default",
+      }}
+    >
+      {/* ── Rutile: upper-left ──────────────────────────────── */}
+      <FloatingRock
+        src={ROCKS.rutile.src}
+        alt={ROCKS.rutile.alt}
+        width={{ xs: "70vw", md: "36vw" }}
+        top="15%"
+        left="18%"
+        parallaxSpeed={0.15}
+        floatX={6}
+        floatY={5}
+        floatDuration={7}
+        zIndex={2}
+      />
+
+      {/* ── Cuprotungstite: lower-right ─────────────────────── */}
+      <FloatingRock
+        src={ROCKS.cuprotungstite.src}
+        alt={ROCKS.cuprotungstite.alt}
+        width={{ xs: "60vw", md: "38vw" }}
+        bottom="-40%"
+        right="20%"
+        rotate={0}
+        parallaxSpeed={0.5}
+        floatX={10}
+        floatY={7}
+        floatDuration={8}
+        zIndex={2}
+      />
+
+      {/* ── Titanite: upper-right (partially cropped) ──────── */}
+      <FloatingRock
+        src={ROCKS.titanite.src}
+        alt={ROCKS.titanite.alt}
+        width={{ xs: "35vw", md: "30vw" }}
+        top="10%"
+        right="-8%"
+        parallaxSpeed={0.25}
+        floatX={5}
+        floatY={4}
+        floatDuration={9}
+        zIndex={1}
+      />
+
+      {/* ── Cuprotungstite: lower-left (peeking from edge) ─── */}
+      <FloatingRock
+        src={ROCKS.cuprotungstite.src}
+        alt="Cuprotungstite mineral specimen (background)"
+        width={{ xs: "40vw", md: "32vw" }}
+        bottom="-18%"
+        left="-28%"
+        rotate={57}
+        parallaxSpeed={0.4}
+        floatX={7}
+        floatY={5}
+        floatDuration={10}
+        zIndex={0}
+        shadow={false}
+      />
+
+      {/* Foreground: flex column — no absolute positioning for labels */}
+      <Stack
+        direction="column"
+        sx={{
+          position: "relative",
+          zIndex: 3,
+          pt: { xs: 10, md: "10%" },
+          pb: { xs: 4, md: 6 },
+        }}
+      >
+        {/* Rutile: inset from left; stack aligns labels to the right (Figma) */}
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "flex-start",
+            flexShrink: 0,
+            pl: { xs: 2, sm: 4, md: "7%" },
+            pr: { xs: 2, md: 3 },
+          }}
+        >
+          <Stack spacing={1} alignItems="flex-end">
+            <GlassLabel
+              sx={{
+                fontSize: { xs: "2rem", md: "4rem" },
+                textAlign: "right",
+              }}
+            >
+              {ROCKS.rutile.name}
+            </GlassLabel>
+            <GlassLabel sx={rutileLocationLabelSx}>
+              {ROCKS.rutile.location}
+            </GlassLabel>
+          </Stack>
+        </Box>
+
+        {/* Title: fills remaining space, vertically centered */}
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 0,
+            pointerEvents: "none",
+            py: { xs: 1, md: 2 },
+          }}
+        >
+          <motion.div style={{ y: titleY, opacity: titleOpacity }}>
+            <Typography
+              variant="h1"
+              sx={{
+                textAlign: "center",
+                color: "text.primary",
+                textShadow: "0px 4px 10px #215a5a",
+                fontSize: { xs: "3.5rem", sm: "6rem", md: "9.7rem" },
+                userSelect: "none",
+                "& span": {
+                  color: "primary.main",
+                },
+              }}
+            >
+              MINERAL <span>DB</span>
+            </Typography>
+          </motion.div>
+        </Box>
+
+        {/* Cuprotungstite: inset from right; stack aligns labels to the left (Figma) */}
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "flex-end",
+            flexShrink: 0,
+            pr: { xs: 2, sm: 4, md: "6%" },
+            pl: { xs: 2, md: 3 },
+          }}
+        >
+          <Stack spacing={1} alignItems="flex-start">
+            <GlassLabel
+              sx={{
+                fontSize: { xs: "2rem", md: "4rem" },
+                textAlign: "left",
+              }}
+            >
+              {ROCKS.cuprotungstite.name}
+            </GlassLabel>
+            <GlassLabel sx={cuproLocationLabelSx}>
+              {ROCKS.cuprotungstite.location}
+            </GlassLabel>
+          </Stack>
+        </Box>
+      </Stack>
+    </Box>
+  );
+}

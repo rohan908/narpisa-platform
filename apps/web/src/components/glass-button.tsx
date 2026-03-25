@@ -2,20 +2,26 @@
 
 import Button, { type ButtonProps } from "@mui/material/Button";
 import { alpha } from "@mui/material/styles";
+import Link from "next/link";
 
-/**
- * Glass-style pill button from Figma (node 203:446).
- * Default: frosted grey glass; pressed/active: primary-tinted glass.
- */
+type GlassButtonProps = ButtonProps & {
+  /** When provided, renders as a next/link anchor */
+  href?: string;
+};
+
 export default function GlassButton({
   children = "glass button",
+  href,
   sx,
   ...props
-}: ButtonProps) {
+}: GlassButtonProps) {
+  const linkProps = href ? { component: Link, href } : {};
+
   return (
     <Button
       disableRipple
       variant="text"
+      {...linkProps}
       sx={[
         (theme) => ({
           position: "relative",
@@ -31,7 +37,7 @@ export default function GlassButton({
           fontSize: theme.typography.button.fontSize,
           fontWeight: 400,
           lineHeight: 1,
-          textTransform: "lowercase",
+          textDecoration: "none",
           bgcolor: alpha("#a1a1a1", 0.2),
           border: `1px solid ${alpha(theme.palette.common.white, 0.14)}`,
           boxShadow: `inset 0 1px 0 0 ${alpha(theme.palette.common.white, 0.1)}, inset 0 -1px 0 0 ${alpha(theme.palette.common.white, 0.1)}`,
