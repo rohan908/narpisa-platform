@@ -7,8 +7,7 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 
 import GlassButtonLink from "@/components/glass-button-link";
-import GlassButton from "@/components/glass-button";
-
+import GlassLabel from "@/components/glass-label";
 
 export default function Home() {
   return (
@@ -19,7 +18,7 @@ export default function Home() {
         py: { xs: 6, md: 9 },
       }}
     >
-      <GlassButton>test</GlassButton>
+      <GlassLabel>test label</GlassLabel>
       <Container maxWidth="lg">
         <Stack spacing={4}>
           <Box
@@ -58,7 +57,12 @@ export default function Home() {
                   </Typography>
                 </Box>
 
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={2}
+                  alignItems="flex-start"
+                >
+                  <GlassLabel>label</GlassLabel>
                   <GlassButtonLink href="/data_input">
                     glass button
                   </GlassButtonLink>
