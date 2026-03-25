@@ -109,28 +109,42 @@ const theme = createTheme({
     h1: {
       fontFamily: fontStyle,
       fontWeight: 400,
-      lineHeight: 1.1,
+      fontSize: "9.7rem",
     },
     h2: {
       fontFamily: fontStyle,
       fontWeight: 400,
-      lineHeight: 1.2,
+      fontSize: "8rem",
     },
     h3: {
       fontFamily: fontStyle,
       fontWeight: 400,
+      fontSize: "6rem",
     },
     h4: {
       fontFamily: fontStyle,
       fontWeight: 400,
+      fontSize: "4rem",
     },
     h5: {
       fontFamily: fontStyle,
       fontWeight: 400,
+      fontSize: "2rem",
     },
     h6: {
       fontFamily: fontStyle,
       fontWeight: 400,
+      fontSize: "1.5rem",
+    },
+    body1: {
+      fontFamily: fontMain,
+      fontWeight: 400,
+      fontSize: "3rem",
+    },
+    body2: {
+      fontFamily: fontMain,
+      fontWeight: 400,
+      fontSize: "4rem",
     },
     style: {
       fontFamily: fontStyle,
