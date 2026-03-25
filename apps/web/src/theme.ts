@@ -159,6 +159,26 @@ const theme = createTheme({
       fontSize: "2rem",
     },
   },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        html: {
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
+        },
+        body: {
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          "&::-webkit-scrollbar": {
+            display: "none",
+          },
+        },
+      },
+    },
+  },
 });
 
 export default theme;

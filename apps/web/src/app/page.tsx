@@ -1,5 +1,6 @@
 import Box from "@mui/material/Box";
 
+import AfricaMapFrame from "@/components/africa-map-frame";
 import GlassNav from "@/components/glass-nav";
 import MineralHero from "@/components/mineral-hero";
 
@@ -9,14 +10,12 @@ export default function Home() {
       component="main"
       sx={{
         bgcolor: "background.default",
-        /* One viewport tall: nav is fixed and does not reserve flow space */
-        height: "100dvh",
-        maxHeight: "100dvh",
-        overflow: "hidden",
+        overflowX: "hidden",
       }}
     >
       <GlassNav />
       <MineralHero />
+      <AfricaMapFrame />
     </Box>
   );
 }
