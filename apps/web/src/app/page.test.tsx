@@ -38,19 +38,24 @@ beforeAll(() => {
     disconnect(): void {}
   } as unknown as typeof ResizeObserver;
 
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => {
-    const minWidthMatch = query.match(/min-width:\s*(\d+)px/);
-    const minWidth = minWidthMatch ? Number(minWidthMatch[1]) : 0;
-    return {
-      matches: minWidth >= 600,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    };
+  // jsdom does not implement matchMedia; spyOn fails if the property is missing.
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockImplementation((query: string) => {
+      const minWidthMatch = query.match(/min-width:\s*(\d+)px/);
+      const minWidth = minWidthMatch ? Number(minWidthMatch[1]) : 0;
+      return {
+        matches: minWidth >= 600,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      };
+    }),
   });
 });
 
