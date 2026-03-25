@@ -37,7 +37,7 @@ declare module "@mui/material/styles" {
 const theme = createTheme({
   palette: {
     mode: "light",
-    primary: {
+    primary: { //orange
       main: "#FFA102",
       100: "#ffd6ba",
       200: "#FFA102",
@@ -47,7 +47,7 @@ const theme = createTheme({
       600: "#3e2400",
       700: "#1c0e00",
     },
-    secondary: {
+    secondary: { //red
       main: "#BC2D29",
       100: "#fceded",
       200: "#f8caca",
@@ -57,7 +57,7 @@ const theme = createTheme({
       600: "#801c19",
       700: "#490b0a",
     },
-    background: {
+    background: { //cream
       default: "#F4EED1",
       main: "#F4EED1",
       100: "#F4EED1",
@@ -68,7 +68,7 @@ const theme = createTheme({
       600: "#383629",
       700: "#191811",
     },
-    accent: {
+    accent: { //purple
       100: "#f2eff9",
       200: "#cfc7e8",
       300: "#ab9cd7",
@@ -78,11 +78,11 @@ const theme = createTheme({
       700: "#21153B",
       main: "#432E6F",
     },
-    text: {
+    text: { //black
       primary: "#181817",
       secondary: "#575653",
     },
-    grey: {
+    grey: { //grey
       100: "#eeede9",
       200: "#c6c5bf",
       300: "#9f9e9a",
