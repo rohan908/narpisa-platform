@@ -62,7 +62,7 @@ export default function GlassNav() {
             <GlassButton
               key={link.label}
               href={link.href}
-              sx={{ fontSize: { xs: "1.8rem", md: "3rem" }, fontWeight: 700 }}
+              sx={{ fontSize: { xs: "1.8rem", md: "2rem" }, fontWeight: 700 }}
             >
               {link.label}
             </GlassButton>
@@ -76,8 +76,11 @@ export default function GlassNav() {
                 color: "secondary.main",
                 textDecoration: "none",
                 fontWeight: 700,
-                fontSize: { xs: "1.8rem", md: "3rem" },
-                "&:hover": { color: "primary.main" },
+                fontSize: { xs: "1.8rem", md: "2rem" },
+                "&:hover": { 
+                  color: "primary.main",
+                  transform: "translateY(-2px)",
+                },
                 transition: "color 0.2s",
               }}
             >
@@ -89,7 +92,7 @@ export default function GlassNav() {
 
       <GlassButton
         href="/signin"
-        sx={{ fontSize: { xs: "1.8rem", md: "3rem" }, fontWeight: 700 }}
+        sx={{ fontSize: { xs: "1.8rem", md: "2rem" }, fontWeight: 700 }}
       >
         Sign In
       </GlassButton>
