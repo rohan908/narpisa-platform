@@ -2,10 +2,9 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
 import GlassNav from "@/components/glass-nav";
+import theme from "@/theme";
 
-import { useTheme } from "@mui/material/styles";
 export default function AboutPage() {
-  const theme = useTheme();
   return (
     <Box
       component="main"

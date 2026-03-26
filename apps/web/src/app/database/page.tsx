@@ -2,10 +2,8 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
 import GlassNav from "@/components/glass-nav";
-import { useTheme } from "@mui/material/styles";
 
 export default function DatabasePage() {
-  const theme = useTheme();
   return (
     <Box
       component="main"
@@ -17,7 +15,7 @@ export default function DatabasePage() {
           component="h1"
           variant="h4"
           sx={{
-            color: theme.palette.secondary.main,
+            color: "secondary.main",
             mb: 2,
           }}
         >
