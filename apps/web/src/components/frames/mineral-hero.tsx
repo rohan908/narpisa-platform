@@ -11,8 +11,8 @@ import {
   useSpring,
 } from "motion/react";
 
-import FloatingRock from "./floating-rock";
-import GlassLabel from "./glass-label";
+import FloatingRock from "../floating-rock";
+import GlassLabel from "../glass-label";
 
 /** Extra scroll distance through the hero (parallax + handoff to next section). */
 const HERO_SCROLL_VH = 1.2;

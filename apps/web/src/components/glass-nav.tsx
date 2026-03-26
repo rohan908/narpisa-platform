@@ -24,6 +24,7 @@ export default function GlassNav() {
   return (
     <Box
       component="nav"
+      aria-label="Primary navigation"
       sx={{
         position: "fixed",
         top: 0,

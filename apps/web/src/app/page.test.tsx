@@ -87,7 +87,7 @@ describe("Home page", () => {
     expect(brand).toHaveAttribute("href", "/");
   });
 
-  it("links to the database page from nav", () => {
+  it("links to the data input page from the Database nav item", () => {
     renderHome();
 
     expect(

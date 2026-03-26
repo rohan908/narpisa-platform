@@ -8,7 +8,7 @@ import DottedMap from "dotted-map/without-countries";
 
 import { PinContainer } from "@/components/ui/3d-pin";
 
-import africaMapJson from "./africa-map-data";
+import africaMapJson from "./ui/africa-map-data";
 
 interface Marker {
   lat: number;

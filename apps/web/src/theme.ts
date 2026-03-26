@@ -165,6 +165,16 @@ const theme = createTheme({
     },
   },
   components: {
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          fontFamily: fontMain,
+          fontSize: "2rem",
+          fontWeight: 400,
+          lineHeight: 1.3,
+        },
+      },
+    },
     MuiCssBaseline: {
       styleOverrides: {
         html: {
