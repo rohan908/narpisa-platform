@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, vi } from "vitest";
 
 import ThemeRegistry from "@/components/theme-registry";
+import { nextNavigationMock } from "@/test/next-navigation-mock";
 
 import DataInputPage from "./page";
 
@@ -41,9 +42,14 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  nextNavigationMock.pathname = "/";
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  nextNavigationMock.pathname = "/data_input";
 });
 
 function renderDataInput() {

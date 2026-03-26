@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, vi } from "vitest";
 
 import ThemeRegistry from "@/components/theme-registry";
+import { nextNavigationMock } from "@/test/next-navigation-mock";
 
 import Home from "./page";
 
@@ -61,6 +62,10 @@ beforeAll(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  nextNavigationMock.pathname = "/";
 });
 
 describe("Home page", () => {
