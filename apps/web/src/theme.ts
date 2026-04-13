@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { createTheme } from "@mui/material/styles";
 
-const fontMain = 'var(--font-chathura), "Helvetica Neue", Arial, sans-serif';
-const fontStyle = 'var(--font-bruno-ace), var(--font-chathura), sans-serif';
+const fontMain = 'var(--font-manrope), "Helvetica Neue", Arial, sans-serif';
+const fontStyle = 'var(--font-bruno-ace), var(--font-manrope), sans-serif';
 
 declare module "@mui/material/styles" {
   interface TypeBackground {
@@ -155,6 +155,7 @@ const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         html: {
+          fontSize: "62.5%",
           scrollbarWidth: "none",
           msOverflowStyle: "none",
           "&::-webkit-scrollbar": {

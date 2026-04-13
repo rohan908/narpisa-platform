@@ -5,6 +5,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 
 import GlassButton from "./glass-button";
 
@@ -16,8 +17,9 @@ interface NavLink {
 const NAV_LINKS: NavLink[] = [
   { label: "Home", href: "/" },
   { label: "About", href: "/about" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Database", href: "/data_input" },
+  { label: "Database", href: "" },
+  { label: "Upload", href: "/data_input" },
+  { label: "Sign In", href: "/signin" },
 ];
 
 function navLinkIsActive(pathname: string, href: string): boolean {
@@ -52,20 +54,32 @@ export default function GlassNav() {
         href="/"
         variant="body1"
         sx={{
-          color: "secondary.main",
+          color: "background.paper",
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
           textDecoration: "none",
           fontWeight: 700,
           fontSize: { xs: "2rem", md: "3rem" },
         }}
       >
-        MineralDB
+        <Image
+          src="/logo.png"
+          alt="MineralDB Logo"
+          width={100}
+          height={91}
+        />
+        NaRPISA Files
       </Typography>
 
       <Stack
         direction="row"
         spacing={{ xs: 1, md: 7 }}
-        alignItems="center"
-        sx={{ display: { xs: "none", sm: "flex" } }}
+        justifyContent="flex-end" 
+        sx={{
+          display: { xs: "none", sm: "flex" },
+          flexGrow: 1,
+        }}
       >
         {NAV_LINKS.map((link) =>
           navLinkIsActive(pathname, link.href) ? (
@@ -83,12 +97,12 @@ export default function GlassNav() {
               href={link.href}
               variant="body1"
               sx={{
-                color: "secondary.main",
+                color: "background.paper",
                 textDecoration: "none",
                 fontWeight: 700,
                 fontSize: { xs: "1.8rem", md: "2rem" },
                 "&:hover": { 
-                  color: "primary.main",
+                  color: "background.paper",
                   transform: "translateY(-2px)",
                 },
                 transition: "color 0.2s",
@@ -98,14 +112,15 @@ export default function GlassNav() {
             </Typography>
           ),
         )}
-      </Stack>
 
-      <GlassButton
-        href="/signin"
-        sx={{ fontSize: { xs: "1.8rem", md: "2rem" }, fontWeight: 700 }}
-      >
-        Sign In
-      </GlassButton>
+        <GlassButton
+          href="/subscriptions"
+          sx={{ fontSize: { xs: "1.8rem", md: "2rem" }, fontWeight: 700 }}
+        >
+          Subscribe
+        </GlassButton>
+
+      </Stack>
     </Box>
   );
 }

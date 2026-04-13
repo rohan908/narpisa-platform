@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Bruno_Ace, Chathura } from "next/font/google";
+import { Bruno_Ace, Chathura, Manrope } from "next/font/google";
 
 import ThemeRegistry from "@/components/theme-registry";
 
 import "./globals.css";
 
 /** Primary UI copy: body, forms, dense UI text */
-const chathura = Chathura({
-  variable: "--font-chathura",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
-  weight: ["100", "300", "400", "700", "800"],
+  weight: ["200", "300", "400", "700", "800"],
   display: "swap",
 });
 
@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${chathura.variable} ${brunoAce.variable} antialiased`}
+        className={`${manrope.variable} ${brunoAce.variable} antialiased`}
       >
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>

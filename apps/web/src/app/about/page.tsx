@@ -25,6 +25,7 @@ export default function AboutPage() {
         </Typography>
         <Typography color="text.secondary" variant="body1" sx={{ fontSize: "1.25rem" }}>
           MineralDB product information will live here.
+          WOOOOOOOOOOOOOOOOOOOOOOOOOOOO
         </Typography>
       </Box>
     </Box>

@@ -1,6 +1,5 @@
 import Box from "@mui/material/Box";
 
-import AfricaMapFrame from "@/components/frames/africa-map-frame";
 import GlassNav from "@/components/glass-nav";
 import MineralHero from "@/components/frames/mineral-hero";
 
@@ -10,12 +9,16 @@ export default function Home() {
       component="main"
       sx={{
         bgcolor: "background.default",
+        minHeight: "100vh",
         overflowX: "hidden",
+        backgroundImage: "url('/landingimage.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
       }}
     >
       <GlassNav />
-      <MineralHero />
-      <AfricaMapFrame />
+      {/* <MineralHero /> */}
     </Box>
   );
 }
