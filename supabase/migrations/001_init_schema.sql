@@ -81,48 +81,48 @@ create table public.subscriptions (
 
 -- DOCUMENTS & PROCESSING PIPELINE
 create table public.documents (
-  id serial primary key,
-  title text not null,
-  source_url text not null unique,
-  source_domain text not null,
-  attribution text not null,
-  notes text,
-  mime_type text not null default 'application/pdf',
-  content_hash text,
-  last_http_status integer,
-  last_fetched_at timestamptz,
-  latest_processed_at timestamptz,
-  latest_job_status public.processing_job_status not null default 'queued',
-  created_by uuid references public.profiles (id) on delete set null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+    id serial primary key,
+    title text not null,
+    source_url text not null unique,
+    source_domain text not null,
+    attribution text not null,
+    notes text,
+    mime_type text not null default 'application/pdf',
+    content_hash text,
+    last_http_status integer,
+    last_fetched_at timestamptz,
+    latest_processed_at timestamptz,
+    latest_job_status public.processing_job_status not null default 'queued',
+    created_by uuid references public.profiles (id) on delete set null,
+    created_at timestamptz not null default timezone('utc', now()),
+    updated_at timestamptz not null default timezone('utc', now())
 );
 
 create table public.processing_jobs (
-  id uuid primary key default gen_random_uuid(),
-  document_id integer not null references public.documents (id) on delete cascade,
-  status public.processing_job_status not null default 'queued',
-  source_http_status integer,
-  worker_version text not null default '0.1.0',
-  page_count integer,
-  extracted_excerpt text,
-  error_message text,
-  started_at timestamptz,
-  completed_at timestamptz,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+    id uuid primary key default gen_random_uuid(),
+    document_id integer not null references public.documents (id) on delete cascade,
+    status public.processing_job_status not null default 'queued',
+    source_http_status integer,
+    worker_version text not null default '0.1.0',
+    page_count integer,
+    extracted_excerpt text,
+    error_message text,
+    started_at timestamptz,
+    completed_at timestamptz,
+    created_at timestamptz not null default timezone('utc', now()),
+    updated_at timestamptz not null default timezone('utc', now())
 );
 
 create table public.extracted_records (
-  id uuid primary key default gen_random_uuid(),
-  document_id integer not null references public.documents (id) on delete cascade,
-  job_id uuid references public.processing_jobs (id) on delete set null,
-  record_type text not null,
-  source_section text,
-  confidence numeric(4, 3),
-  payload jsonb not null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
+    id uuid primary key default gen_random_uuid(),
+    document_id integer not null references public.documents (id) on delete cascade,
+    job_id uuid references public.processing_jobs (id) on delete set null,
+    record_type text not null,
+    source_section text,
+    confidence numeric(4, 3),
+    payload jsonb not null,
+    created_at timestamptz not null default timezone('utc', now()),
+    updated_at timestamptz not null default timezone('utc', now())
 );
 
 create table public.citations (
@@ -187,9 +187,23 @@ create table public.commodities (
 );
 
 create table public.site_commodities (
-  site_id integer references public.sites(id) on delete cascade,
-  commodity_id integer references public.commodities(id) on delete cascade,
-  primary key (site_id, commodity_id)
+    site_id integer references public.sites(id) on delete cascade,
+    commodity_id integer references public.commodities(id) on delete cascade,
+    primary key (site_id, commodity_id)
+);
+
+-- LICENSES
+create table public.licenses (
+    id serial primary key,
+    type text not null,
+    country_id integer references public.countries (id) on delete cascade,
+    region text,
+    status text check (status in ('active', 'inactive')) default 'active',
+    applicants text[] not null,
+    application_date date not null,
+    start_date date,
+    end_date date,
+    CHECK (end_date is null or end_date >= start_date)
 );
 
 
