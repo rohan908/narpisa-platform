@@ -2,8 +2,8 @@ from pathlib import Path
 
 from httpx import ASGITransport, AsyncClient
 
-from app.main import app
 from app.data.services import FetchResult
+from app.main import app
 
 
 async def test_process_source_returns_parsed_metadata(

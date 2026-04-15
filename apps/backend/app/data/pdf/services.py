@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from app.core.config import Settings, get_settings
-from app.data.services import FetchResult, fetch_data_source
-from app.data.pdf.models import ParsedDocument, SourceParseRequest, QueuedSourceDocument
-
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from fastapi import HTTPException, status
-from hashlib import sha256
-import httpx
 from pathlib import Path
-from pypdf import PdfReader
 from typing import Any, cast
 from urllib.parse import urlparse
+
+import httpx
+from fastapi import HTTPException
+from pypdf import PdfReader
+
+from app.core.config import Settings, get_settings
+from app.data.pdf.models import ParsedDocument, QueuedSourceDocument, SourceParseRequest
+from app.data.services import FetchResult, fetch_data_source
 
 
 class PdfParser:
@@ -348,7 +347,7 @@ class _AsyncClientManager:
     async def __aexit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
         if self._owned_client is not None:
             await self._owned_client.aclose()
-            
+
 
 class QueuedDocumentProcessor:
     async def process(self, job_id: str) -> None:
@@ -369,7 +368,7 @@ class QueuedDocumentProcessor:
                 "application/pdf",
                 timeout=settings.fetch_timeout_seconds,
                 chunk_size=settings.fetch_chunk_size_bytes,
-                max_size=settings.fetch_max_bytes
+                max_size=settings.fetch_max_bytes,
             )
 
             await job_store.mark_parsing(
@@ -428,7 +427,7 @@ class QueuedDocumentProcessor:
 
     def _extract_http_status(self, error: HTTPException) -> int | None:
         return error.status_code if isinstance(error.status_code, int) else None
-    
+
 
 class DocumentQueue:
     async def enqueue(self, request: SourceParseRequest) -> QueuedSourceDocument:

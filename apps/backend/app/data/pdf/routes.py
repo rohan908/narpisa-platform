@@ -4,11 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.config import Settings, get_settings
-from app.data.services import FetchResult, fetch_data_source
 from app.data.pdf.models import ParsedDocument, QueuedSourceDocument, SourceParseRequest
 from app.data.pdf.services import PdfParser, document_queue
 from app.data.pdf.tasks import process_queued_document
-
+from app.data.services import fetch_data_source
 
 router = APIRouter()
 
@@ -26,7 +25,7 @@ async def process_source(
         "application/pdf",
         timeout=settings.fetch_timeout_seconds,
         chunk_size=settings.fetch_chunk_size_bytes,
-        max_size=settings.fetch_max_bytes
+        max_size=settings.fetch_max_bytes,
     )
     parser = PdfParser()
     try:

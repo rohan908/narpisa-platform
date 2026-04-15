@@ -4,7 +4,12 @@ import pytest
 
 from app.core.config import Settings
 from app.data.pdf.models import ParsedDocument, QueuedSourceDocument, SourceParseRequest
-from app.data.pdf.services import FetchResult, JobStore, PdfParser, QueuedDocumentProcessor
+from app.data.pdf.services import (
+    FetchResult,
+    JobStore,
+    PdfParser,
+    QueuedDocumentProcessor,
+)
 
 
 @pytest.mark.asyncio

@@ -62,7 +62,10 @@ async def test_fetch_pdf_streams_file_to_disk(tmp_path: Path) -> None:
 
     assert download_path.exists()
     assert result.path == download_path
-    assert result.hash == "82b3244f7b454a46df7211acccffdaf36c180592eddce4f54c7e48ce66a803e8"
+    assert (
+        result.hash
+        == "82b3244f7b454a46df7211acccffdaf36c180592eddce4f54c7e48ce66a803e8"
+    )
     assert result.source_status == 200
 
 
@@ -92,7 +95,9 @@ async def test_fetch_pdf_rejects_missing_content_type(tmp_path: Path) -> None:
             "https://documents.example.org/sample.pdf",
             download_path,
             "application/pdf",
-            client=FakeAsyncClient(FakeStreamResponse(chunks=[b"%PDF"], content_type="")),
+            client=FakeAsyncClient(
+                FakeStreamResponse(chunks=[b"%PDF"], content_type="")
+            ),
         )
 
     assert error.value.status_code == 400

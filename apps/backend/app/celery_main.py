@@ -10,10 +10,7 @@ settings = get_settings()
 celery_app = Celery(
     "narpisa_pdf_worker",
     broker=settings.celery_broker_url,
-    include=[
-        "app.data.namibiamme.tasks",
-        "app.data.pdf.tasks"
-    ],
+    include=["app.data.namibiamme.tasks", "app.data.pdf.tasks"],
 )
 celery_app.conf.update(
     task_ignore_result=True,
