@@ -112,6 +112,8 @@ export default function MarketingHeader({ transparent = false }: MarketingHeader
           <BrandHomeLink size={52} color={textColor} title="MineralDB" subtitle="NaRPISA platform" />
 
           <Stack
+            component="nav"
+            aria-label="Primary"
             direction="row"
             alignItems="center"
             spacing={3.25}

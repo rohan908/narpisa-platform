@@ -1,7 +1,7 @@
 "use client";
 
 import { createElement } from "react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import Box from "@mui/material/Box";
 import Link from "@mui/material/Link";
@@ -29,6 +29,15 @@ type HomePreviewCardProps = {
 const MotionBox = motion.create(Box);
 const PREVIEW_HEIGHT = 470;
 const PREVIEW_WIDTH = 480;
+
+type ShimmerImageProps = {
+  src: string;
+  fadeIn?: boolean;
+  fallback?: ReactNode;
+  NativeImgProps?: {
+    alt: string;
+  };
+};
 
 export default function HomePreviewCard({
   activeSlideId,
@@ -165,14 +174,19 @@ export default function HomePreviewCard({
               },
             }}
           >
-            {createElement(ShimmerImage as unknown as ComponentType<any>, {
-              src: activeSlide.imageSrc,
-              fadeIn: true,
-              fallback: <Shimmer width={PREVIEW_WIDTH} height={PREVIEW_HEIGHT} />,
-              NativeImgProps: {
-                alt: activeSlide.title,
+            {createElement(
+              ShimmerImage as unknown as ComponentType<ShimmerImageProps>,
+              {
+                src: activeSlide.imageSrc,
+                fadeIn: true,
+                fallback: (
+                  <Shimmer width={PREVIEW_WIDTH} height={PREVIEW_HEIGHT} />
+                ),
+                NativeImgProps: {
+                  alt: activeSlide.title,
+                },
               },
-            })}
+            )}
           </Box>
           <Box
             sx={{

@@ -10,7 +10,7 @@ settings = get_settings()
 celery_app = Celery(
     "narpisa_pdf_worker",
     broker=settings.celery_broker_url,
-    include=["app.worker.tasks"],
+    include=["app.data.namibiamme.tasks", "app.data.pdf.tasks"],
 )
 celery_app.conf.update(
     task_ignore_result=True,
@@ -20,6 +20,6 @@ celery_app.conf.update(
 
 @worker_ready.connect
 def requeue_recoverable_jobs(**_: object) -> None:
-    from app.worker.tasks import recover_queued_documents
+    from app.data.pdf.tasks import recover_queued_documents
 
     recover_queued_documents()

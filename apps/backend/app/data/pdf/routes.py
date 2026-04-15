@@ -4,20 +4,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.config import Settings, get_settings
-from app.models.document import ParsedDocument, QueuedSourceDocument, SourceParseRequest
-from app.services.document_queue import document_queue
-from app.services.pdf_parser import PdfParser
-from app.services.source_fetcher import SourceFetcher
-from app.worker.tasks import process_queued_document
+from app.data.pdf.models import ParsedDocument, QueuedSourceDocument, SourceParseRequest
+from app.data.pdf.services import PdfParser, document_queue
+from app.data.pdf.tasks import process_queued_document
+from app.data.services import fetch_data_source
 
 router = APIRouter()
-
-
-@router.get("/health", tags=["health"])
-async def healthcheck(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> dict[str, str]:
-    return {"status": "ok", "service": settings.app_name}
 
 
 @router.post("/process-source", response_model=ParsedDocument, tags=["processing"])
@@ -25,10 +17,16 @@ async def process_source(
     payload: SourceParseRequest,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ParsedDocument:
-    fetcher = SourceFetcher(settings=settings)
     download_path = settings.download_directory / "process-source-debug.pdf"
     download_path.parent.mkdir(parents=True, exist_ok=True)
-    fetch_result = await fetcher.fetch_pdf(str(payload.source_url), download_path)
+    fetch_result = await fetch_data_source(
+        str(payload.source_url),
+        download_path,
+        "application/pdf",
+        timeout=settings.fetch_timeout_seconds,
+        chunk_size=settings.fetch_chunk_size_bytes,
+        max_size=settings.fetch_max_bytes,
+    )
     parser = PdfParser()
     try:
         return parser.parse(payload, fetch_result)

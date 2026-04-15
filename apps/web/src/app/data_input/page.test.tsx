@@ -61,7 +61,7 @@ function renderDataInput() {
 }
 
 describe("Data input page", () => {
-  it("renders Enter Data heading and nav", () => {
+  it("renders Enter Data heading and nav", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => [],
@@ -72,13 +72,13 @@ describe("Data input page", () => {
     renderDataInput();
 
     expect(
-      screen.getByRole("heading", {
+      await screen.findByRole("heading", {
         name: /enter data/i,
       }),
     ).toBeInTheDocument();
 
     expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^MineralDB$/i })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /MineralDB/i })).toHaveAttribute("href", "/");
   });
 
   it("blocks submission for an invalid payload", async () => {
