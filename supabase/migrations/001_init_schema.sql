@@ -447,7 +447,72 @@ create index extracted_records_payload_gin_idx on public.extracted_records using
 create index citations_document_id_idx on public.citations (document_id);
 create index sites_country_id_idx on public.sites (country_id);
 create index subscriptions_profile_id_idx on public.subscriptions (profile_id);
-Ok imp
+create index subscriptions_tier_id_idx on public.subscriptions (tier_id);
+create index documents_created_by_idx on public.documents (created_by);
+create index site_data_stage_idx on public.site_data (stage);
+create index extracted_records_job_id_idx on public.extracted_records (job_id);
+create index site_commodities_commodity_id_idx on public.site_commodities (commodity_id);
+create index site_facts_site_field_idx on public.site_facts (site_id, field_key);
+create index site_facts_site_field_year_idx on public.site_facts (site_id, field_key, effective_year);
+create index site_facts_status_idx on public.site_facts (status);
+create index site_facts_document_id_idx on public.site_facts (document_id);
+create index site_facts_citation_id_idx on public.site_facts (citation_id);
+create index site_facts_extracted_record_id_idx on public.site_facts (extracted_record_id);
+create index site_facts_commodity_id_idx on public.site_facts (commodity_id);
+create index site_facts_provenance_gin_idx on public.site_facts using gin (provenance);
+create index site_water_metrics_definition_id_idx on public.site_water_metrics (definition_id);
+create index site_water_metrics_fact_id_idx on public.site_water_metrics (fact_id);
+create index site_commodity_metrics_commodity_id_idx on public.site_commodity_metrics (commodity_id);
+create index site_commodity_metrics_definition_id_idx on public.site_commodity_metrics (definition_id);
+create index site_commodity_metrics_fact_id_idx on public.site_commodity_metrics (fact_id);
+create index licenses_country_id_idx on public.licenses (country_id);
+
+create unique index site_water_metrics_unique_idx
+on public.site_water_metrics (
+    site_id,
+    definition_id,
+    yr,
+    coalesce(project_label, '')
+);
+
+create unique index site_commodity_metrics_unique_idx
+on public.site_commodity_metrics (
+    site_id,
+    coalesce(commodity_id, 0),
+    definition_id,
+    yr,
+    coalesce(project_label, '')
+);
+
+-- TRIGGERS
+create trigger profiles_set_updated_at
+before update on public.profiles
+for each row execute procedure public.set_updated_at();
+
+create trigger documents_set_updated_at
+before update on public.documents
+for each row execute procedure public.set_updated_at();
+
+create trigger processing_jobs_set_updated_at
+before update on public.processing_jobs
+for each row execute procedure public.set_updated_at();
+
+create trigger extracted_records_set_updated_at
+before update on public.extracted_records
+for each row execute procedure public.set_updated_at();
+
+create trigger sites_set_updated_at
+before update on public.sites
+for each row execute procedure public.set_updated_at();
+
+create trigger site_data_set_updated_at
+before update on public.site_data
+for each row execute procedure public.set_updated_at();
+
+create trigger open_air_sites_set_updated_at
+before update on public.open_air_sites
+for each row execute procedure public.set_updated_at();
+
 create trigger underground_sites_set_updated_at
 before update on public.underground_sites
 for each row execute procedure public.set_updated_at();
