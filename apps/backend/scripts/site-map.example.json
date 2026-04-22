@@ -1,0 +1,26 @@
+{
+  "Navachab": {
+    "site_type": "open_air",
+    "owner": "Navachab Gold Mine",
+    "country": "Namibia",
+    "stage": "production"
+  },
+  "Rossing Uranium": {
+    "site_type": "open_air",
+    "owner": "Rossing Uranium Limited",
+    "country": "Namibia",
+    "stage": "production"
+  },
+  "Skorpion Zinc": {
+    "site_type": "open_air",
+    "owner": "Skorpion Zinc",
+    "country": "Namibia",
+    "stage": "production"
+  },
+  "Kombat mine": {
+    "site_type": "underground",
+    "owner": "Trigon Mining Namibia",
+    "country": "Namibia",
+    "stage": "production"
+  }
+}

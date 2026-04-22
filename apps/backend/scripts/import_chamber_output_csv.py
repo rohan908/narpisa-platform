@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -37,6 +38,21 @@ class DatasetMetadata:
     footnotes: list[str]
 
 
+@dataclass(frozen=True)
+class SiteSeed:
+    site_type: str
+    owner: str
+    country: str | None = None
+    stage: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    lifetime_of_mine_years: float | None = None
+    pit_depth: float | None = None
+    surface_area: float | None = None
+    shaft_depth: float | None = None
+    tunnel_length: float | None = None
+
+
 def parse_args() -> argparse.Namespace:
     default_csv = Path(__file__).with_name(
         "Output-by-Chamber-Members-1990-2023(Output by Mine).csv"
@@ -65,6 +81,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--title", default=DEFAULT_TITLE)
     parser.add_argument("--attribution", default=DEFAULT_ATTRIBUTION)
     parser.add_argument(
+        "--site-map-path",
+        type=Path,
+        help=(
+            "Optional JSON file mapping site labels to site metadata. When "
+            "provided, the importer also writes site_facts and projects rows into "
+            "site_water_metrics or site_commodity_metrics."
+        ),
+    )
+    parser.add_argument(
         "--target",
         choices=("local", "env"),
         default="local",
@@ -83,6 +108,11 @@ def parse_args() -> argparse.Namespace:
 
 def normalize_text(value: str) -> str:
     return " ".join(value.replace("\xa0", " ").strip().split())
+
+
+def slugify_key(value: str) -> str:
+    normalized = normalize_text(value).lower()
+    return re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
 
 
 def split_label_and_unit(label: str) -> tuple[str, str | None]:
@@ -324,14 +354,215 @@ class SupabaseRestClient:
             json_body=payload,
         )
 
+    def get_country_by_name(self, name: str) -> dict[str, Any] | None:
+        payload = self._request(
+            "GET",
+            "/countries",
+            params={"name": f"eq.{name}", "select": "*"},
+        )
+        if not payload:
+            return None
+        return payload[0]
+
+    def create_country(self, name: str) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/countries",
+            headers={"Prefer": "return=representation"},
+            json_body={"name": name},
+        )
+        return response[0]
+
+    def get_site_by_name(self, name: str) -> dict[str, Any] | None:
+        payload = self._request(
+            "GET",
+            "/sites",
+            params={"name": f"eq.{name}", "select": "*"},
+        )
+        if not payload:
+            return None
+        return payload[0]
+
+    def create_site(self, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/sites",
+            headers={"Prefer": "return=representation"},
+            json_body=payload,
+        )
+        return response[0]
+
+    def patch_site(self, site_id: int, payload: dict[str, Any]) -> None:
+        self._request(
+            "PATCH",
+            "/sites",
+            params={"id": f"eq.{site_id}"},
+            json_body=payload,
+        )
+
+    def get_site_data(self, site_id: int) -> dict[str, Any] | None:
+        payload = self._request(
+            "GET",
+            "/site_data",
+            params={"site_id": f"eq.{site_id}", "select": "*"},
+        )
+        if not payload:
+            return None
+        return payload[0]
+
+    def create_site_data(self, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/site_data",
+            headers={"Prefer": "return=representation"},
+            json_body=payload,
+        )
+        return response[0]
+
+    def patch_site_data(self, site_id: int, payload: dict[str, Any]) -> None:
+        self._request(
+            "PATCH",
+            "/site_data",
+            params={"site_id": f"eq.{site_id}"},
+            json_body=payload,
+        )
+
+    def get_subtype_row(self, table_name: str, site_id: int) -> dict[str, Any] | None:
+        payload = self._request(
+            "GET",
+            f"/{table_name}",
+            params={"site_id": f"eq.{site_id}", "select": "*"},
+        )
+        if not payload:
+            return None
+        return payload[0]
+
+    def create_subtype_row(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/{table_name}",
+            headers={"Prefer": "return=representation"},
+            json_body=payload,
+        )
+        return response[0]
+
+    def patch_subtype_row(self, table_name: str, site_id: int, payload: dict[str, Any]) -> None:
+        self._request(
+            "PATCH",
+            f"/{table_name}",
+            params={"site_id": f"eq.{site_id}"},
+            json_body=payload,
+        )
+
+    def get_definition_by_key(self, table_name: str, metric_key: str) -> dict[str, Any] | None:
+        payload = self._request(
+            "GET",
+            f"/{table_name}",
+            params={"metric_key": f"eq.{metric_key}", "select": "*"},
+        )
+        if not payload:
+            return None
+        return payload[0]
+
+    def create_definition(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/{table_name}",
+            headers={"Prefer": "return=representation"},
+            json_body=payload,
+        )
+        return response[0]
+
+    def create_site_fact(self, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            "/site_facts",
+            headers={"Prefer": "return=representation"},
+            json_body=payload,
+        )
+        return response[0]
+
+    def list_site_facts_by_document(self, document_id: int) -> list[dict[str, Any]]:
+        payload = self._request(
+            "GET",
+            "/site_facts",
+            params={"document_id": f"eq.{document_id}", "select": "id"},
+        )
+        return payload or []
+
+    def delete_site_facts_by_document(self, document_id: int) -> None:
+        self._request(
+            "DELETE",
+            "/site_facts",
+            params={"document_id": f"eq.{document_id}"},
+        )
+
+    def delete_site_water_metrics_by_fact_id(self, fact_id: str) -> None:
+        self._request(
+            "DELETE",
+            "/site_water_metrics",
+            params={"fact_id": f"eq.{fact_id}"},
+        )
+
+    def delete_site_commodity_metrics_by_fact_id(self, fact_id: str) -> None:
+        self._request(
+            "DELETE",
+            "/site_commodity_metrics",
+            params={"fact_id": f"eq.{fact_id}"},
+        )
+
+    def get_metric_row(
+        self,
+        table_name: str,
+        *,
+        site_id: int,
+        definition_id: int,
+        yr: int,
+        commodity_id: int | None = None,
+        project_label: str | None = None,
+    ) -> dict[str, Any] | None:
+        params = {
+            "site_id": f"eq.{site_id}",
+            "definition_id": f"eq.{definition_id}",
+            "yr": f"eq.{yr}",
+            "select": "*",
+        }
+        params["project_label"] = (
+            f"eq.{project_label}" if project_label is not None else "is.null"
+        )
+        if table_name == "site_commodity_metrics":
+            params["commodity_id"] = (
+                f"eq.{commodity_id}" if commodity_id is not None else "is.null"
+            )
+        payload = self._request("GET", f"/{table_name}", params=params)
+        if not payload:
+            return None
+        return payload[0]
+
+    def create_metric_row(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request(
+            "POST",
+            f"/{table_name}",
+            headers={"Prefer": "return=representation"},
+            json_body=payload,
+        )
+        return response[0]
+
+    def patch_metric_row(self, table_name: str, row_id: int, payload: dict[str, Any]) -> None:
+        self._request(
+            "PATCH",
+            f"/{table_name}",
+            params={"id": f"eq.{row_id}"},
+            json_body=payload,
+        )
+
 
 def build_document_notes(metadata: DatasetMetadata, csv_path: Path) -> str:
     parts = [
         f"Imported from CSV: {csv_path.name}.",
         (
-            "Imported against the 001_init_schema document-processing tables "
-            "instead of site_data because this CSV does not include the coordinates "
-            "or mine-type fields required by public.sites."
+            "Imported into documents/extracted_records and, when a site mapping is "
+            "provided, projected into site_facts and the yearly metric tables."
         ),
     ]
     if metadata.source_line:
@@ -356,7 +587,6 @@ def build_record_payloads(
             "job_id": job_id,
             "record_type": "dataset_metadata",
             "source_section": "dataset",
-            "confidence": 1.0,
             "payload": {
                 "dataset_name": dataset_name,
                 "year_range": {"start": years[0], "end": years[-1]},
@@ -374,7 +604,6 @@ def build_record_payloads(
                 "job_id": job_id,
                 "record_type": DEFAULT_RECORD_TYPE,
                 "source_section": row["context_label"],
-                "confidence": 1.0,
                 "payload": {
                     "dataset_name": dataset_name,
                     "row_label": row["row_label"],
@@ -479,6 +708,265 @@ def resolve_supabase_rest_config(*, target: str) -> tuple[str, str]:
     return resolve_env_supabase_rest_config()
 
 
+def load_site_seeds(site_map_path: Path | None) -> dict[str, SiteSeed]:
+    if site_map_path is None:
+        return {}
+    payload = json.loads(site_map_path.read_text(encoding="utf-8"))
+    seeds: dict[str, SiteSeed] = {}
+    for raw_key, raw_value in payload.items():
+        key = normalize_text(raw_key)
+        seeds[key] = SiteSeed(
+            site_type=normalize_text(raw_value["site_type"]),
+            owner=normalize_text(raw_value.get("owner", key)),
+            country=normalize_text(raw_value["country"]) if raw_value.get("country") else None,
+            stage=normalize_text(raw_value["stage"]) if raw_value.get("stage") else None,
+            latitude=float(raw_value["latitude"]) if raw_value.get("latitude") is not None else None,
+            longitude=float(raw_value["longitude"]) if raw_value.get("longitude") is not None else None,
+            lifetime_of_mine_years=(
+                float(raw_value["lifetime_of_mine_years"])
+                if raw_value.get("lifetime_of_mine_years") is not None
+                else None
+            ),
+            pit_depth=float(raw_value["pit_depth"]) if raw_value.get("pit_depth") is not None else None,
+            surface_area=(
+                float(raw_value["surface_area"])
+                if raw_value.get("surface_area") is not None
+                else None
+            ),
+            shaft_depth=(
+                float(raw_value["shaft_depth"])
+                if raw_value.get("shaft_depth") is not None
+                else None
+            ),
+            tunnel_length=(
+                float(raw_value["tunnel_length"])
+                if raw_value.get("tunnel_length") is not None
+                else None
+            ),
+        )
+    return seeds
+
+
+def classify_series_row(row: dict[str, Any]) -> tuple[str, str, str]:
+    context_label = row.get("context_label")
+    if context_label:
+        site_label = normalize_text(context_label)
+        metric_label = row["series_name"]
+    else:
+        site_label = normalize_text(row["series_name"])
+        metric_label = "Reported output"
+
+    metric_key = slugify_key(metric_label)
+    water_metric_keys = {
+        "groundwater",
+        "fresh_water",
+        "recycled_water",
+        "total_water",
+        "water_use_efficiency",
+    }
+    table_name = (
+        "site_water_metrics"
+        if metric_key in water_metric_keys
+        else "site_commodity_metrics"
+    )
+    return site_label, metric_key, table_name
+
+
+def ensure_country(
+    client: SupabaseRestClient, country_name: str | None
+) -> int | None:
+    if country_name is None:
+        return None
+    existing = client.get_country_by_name(country_name)
+    if existing is not None:
+        return int(existing["id"])
+    return int(client.create_country(country_name)["id"])
+
+
+def ensure_site(
+    client: SupabaseRestClient,
+    *,
+    site_label: str,
+    site_seed: SiteSeed,
+) -> int:
+    country_id = ensure_country(client, site_seed.country)
+    existing = client.get_site_by_name(site_label)
+    payload = {
+        "name": site_label,
+        "owner": site_seed.owner,
+        "country_id": country_id,
+        "site_type": site_seed.site_type,
+    }
+    if existing is None:
+        site = client.create_site(payload)
+        site_id = int(site["id"])
+    else:
+        site_id = int(existing["id"])
+        client.patch_site(site_id, payload)
+
+    site_data_payload = {
+        "site_id": site_id,
+        "stage": site_seed.stage,
+        "latitude": site_seed.latitude,
+        "longitude": site_seed.longitude,
+        "lifetime_of_mine_years": site_seed.lifetime_of_mine_years,
+    }
+    site_data_row = client.get_site_data(site_id)
+    if site_data_row is None:
+        client.create_site_data(site_data_payload)
+    else:
+        client.patch_site_data(site_id, site_data_payload)
+
+    subtype_table = (
+        "underground_sites"
+        if site_seed.site_type == "underground"
+        else "open_air_sites"
+    )
+    subtype_payload: dict[str, Any] = {"site_id": site_id}
+    if subtype_table == "underground_sites":
+        subtype_payload.update(
+            {
+                "shaft_depth": site_seed.shaft_depth,
+                "tunnel_length": site_seed.tunnel_length,
+            }
+        )
+    else:
+        subtype_payload.update(
+            {
+                "pit_depth": site_seed.pit_depth,
+                "surface_area": site_seed.surface_area,
+            }
+        )
+    subtype_row = client.get_subtype_row(subtype_table, site_id)
+    if subtype_row is None:
+        client.create_subtype_row(subtype_table, subtype_payload)
+    else:
+        client.patch_subtype_row(subtype_table, site_id, subtype_payload)
+    return site_id
+
+
+def ensure_metric_definition(
+    client: SupabaseRestClient,
+    *,
+    table_name: str,
+    metric_key: str,
+    label: str,
+    unit: str | None,
+) -> int:
+    definitions_table = (
+        "site_water_metric_definitions"
+        if table_name == "site_water_metrics"
+        else "site_commodity_metric_definitions"
+    )
+    existing = client.get_definition_by_key(definitions_table, metric_key)
+    if existing is not None:
+        return int(existing["id"])
+
+    payload: dict[str, Any] = {
+        "metric_key": metric_key,
+        "label": label,
+        "default_unit": unit,
+        "sort_order": 1000,
+    }
+    if definitions_table == "site_commodity_metric_definitions":
+        payload["commodity_scoped"] = False
+    created = client.create_definition(definitions_table, payload)
+    return int(created["id"])
+
+
+def project_rows_to_site_facts(
+    client: SupabaseRestClient,
+    *,
+    document_id: int,
+    dataset_name: str,
+    series_rows: list[dict[str, Any]],
+    site_seeds: dict[str, SiteSeed],
+) -> dict[str, int]:
+    if not site_seeds:
+        return {"projected_rows": 0, "skipped_rows": len(series_rows)}
+
+    existing_facts = client.list_site_facts_by_document(document_id)
+    for fact in existing_facts:
+        fact_id = str(fact["id"])
+        client.delete_site_water_metrics_by_fact_id(fact_id)
+        client.delete_site_commodity_metrics_by_fact_id(fact_id)
+    if existing_facts:
+        client.delete_site_facts_by_document(document_id)
+
+    projected_rows = 0
+    skipped_rows = 0
+    imported_at = utc_now()
+
+    for row in series_rows:
+        site_label, metric_key, table_name = classify_series_row(row)
+        site_seed = site_seeds.get(site_label)
+        if site_seed is None:
+            skipped_rows += 1
+            continue
+
+        site_id = ensure_site(client, site_label=site_label, site_seed=site_seed)
+        definition_id = ensure_metric_definition(
+            client,
+            table_name=table_name,
+            metric_key=metric_key,
+            label=row["series_name"] if row.get("context_label") else "Reported output",
+            unit=row["unit"],
+        )
+        for cell in row["values_by_year"]:
+            if cell["numeric_value"] is None:
+                continue
+            provenance = {
+                "document_id": document_id,
+                "source_url": DEFAULT_SOURCE_URL,
+                "uploaded_at": imported_at,
+                "uploaded_by": "import_chamber_output_csv.py",
+                "dataset_name": dataset_name,
+                "row_label": row["row_label"],
+                "context_label": row["context_label"],
+                "source_line_number": row["line_number"],
+                "raw_value": cell["raw_value"],
+                "note": cell["note"],
+            }
+            fact = client.create_site_fact(
+                {
+                    "site_id": site_id,
+                    "document_id": document_id,
+                    "field_key": metric_key,
+                    "table_target": table_name,
+                    "subtype_scope": site_seed.site_type,
+                    "value_type": "numeric",
+                    "value_numeric": cell["numeric_value"],
+                    "effective_year": cell["year"],
+                    "unit": row["unit"],
+                    "project_label": row["context_label"],
+                    "status": "accepted",
+                    "provenance": provenance,
+                }
+            )
+            metric_payload = {
+                "site_id": site_id,
+                "definition_id": definition_id,
+                "yr": cell["year"],
+                "value_numeric": cell["numeric_value"],
+                "unit": row["unit"] or "",
+                "project_label": row["context_label"],
+                "fact_id": fact["id"],
+            }
+            existing_metric = client.get_metric_row(
+                table_name,
+                site_id=site_id,
+                definition_id=definition_id,
+                yr=int(cell["year"]),
+                project_label=row["context_label"],
+            )
+            if existing_metric is None:
+                client.create_metric_row(table_name, metric_payload)
+            else:
+                client.patch_metric_row(table_name, int(existing_metric["id"]), metric_payload)
+            projected_rows += 1
+    return {"projected_rows": projected_rows, "skipped_rows": skipped_rows}
+
+
 def upsert_dataset_document(
     client: SupabaseRestClient,
     *,
@@ -514,6 +1002,7 @@ def run_import(args: argparse.Namespace) -> None:
     rows = load_csv_rows(args.csv_path)
     years, series_rows, metadata = parse_series_rows(rows)
     notes = build_document_notes(metadata, args.csv_path)
+    site_seeds = load_site_seeds(args.site_map_path)
 
     print(
         f"Parsed {len(series_rows)} series rows covering {years[0]}-{years[-1]} "
@@ -574,6 +1063,14 @@ def run_import(args: argparse.Namespace) -> None:
         for batch in chunked(record_payloads, size=100):
             client.insert_extracted_records(batch)
 
+        projection_summary = project_rows_to_site_facts(
+            client,
+            document_id=int(document_id),
+            dataset_name=DEFAULT_DATASET_NAME,
+            series_rows=series_rows,
+            site_seeds=site_seeds,
+        )
+
         completed_at = utc_now()
         client.patch_job(
             job_id,
@@ -581,8 +1078,9 @@ def run_import(args: argparse.Namespace) -> None:
                 "status": "completed",
                 "completed_at": completed_at,
                 "extracted_excerpt": (
-                    f"Imported {len(series_rows)} series rows and "
-                    f"{len(record_payloads)} extracted records."
+                    f"Imported {len(series_rows)} series rows, "
+                    f"{len(record_payloads)} extracted records, and "
+                    f"{projection_summary['projected_rows']} projected fact rows."
                 ),
             },
         )
@@ -594,8 +1092,10 @@ def run_import(args: argparse.Namespace) -> None:
             },
         )
         print(
-            f"Imported {len(record_payloads)} records into Supabase for document "
-            f"{document_id}."
+            f"Imported {len(record_payloads)} extracted records for document "
+            f"{document_id}; projected {projection_summary['projected_rows']} "
+            f"site fact rows and skipped {projection_summary['skipped_rows']} "
+            f"unmapped series rows."
         )
     except Exception as exc:
         if job_id is not None:
