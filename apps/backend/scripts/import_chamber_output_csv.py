@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError
-from urllib.parse import urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import urlparse
+
+from postgrest.types import ReturnMethod
+from supabase import Client, create_client
 
 
 DEFAULT_SOURCE_URL = "https://www.chamberofmines.org.na/"
@@ -21,6 +22,7 @@ DEFAULT_TITLE = "Chamber member output by mine, 1990-2023"
 DEFAULT_ATTRIBUTION = "Chamber of Mines Namibia"
 DEFAULT_RECORD_TYPE = "mining_output_series"
 DEFAULT_DATASET_NAME = "Output by Chamber Members 1990-2023 (Output by Mine)"
+DEFAULT_SITE_MAP_NAME = "site-map.example.json"
 YEAR_COUNT = 34
 
 
@@ -51,6 +53,58 @@ class SiteSeed:
     surface_area: float | None = None
     shaft_depth: float | None = None
     tunnel_length: float | None = None
+
+
+@dataclass(frozen=True)
+class CommodityResolution:
+    site_label: str
+    metric_label: str
+    metric_key: str
+    product_label: str
+    table_name: str
+    unit: str | None
+    commodity_name: str | None = None
+    commodity_ore_type: str | None = None
+    commodity_scoped: bool = False
+
+
+COMMODITY_PATTERNS: tuple[tuple[re.Pattern[str], str, str], ...] = (
+    (re.compile(r"\bdiamond\b|\bcarat", re.IGNORECASE), "Diamond", "carats"),
+    (re.compile(r"\bgold\b", re.IGNORECASE), "Gold", "gold"),
+    (re.compile(r"\buranium\b", re.IGNORECASE), "Uranium", "uranium oxide"),
+    (re.compile(r"\bcopper\b", re.IGNORECASE), "Copper", "copper"),
+    (re.compile(r"\bzinc\b", re.IGNORECASE), "Zinc", "zinc"),
+    (re.compile(r"\blead\b", re.IGNORECASE), "Lead", "lead"),
+    (re.compile(r"\btin\b", re.IGNORECASE), "Tin", "tin"),
+    (re.compile(r"\bfluorspar\b", re.IGNORECASE), "Fluorspar", "fluorspar"),
+    (re.compile(r"\biron ore\b", re.IGNORECASE), "Iron Ore", "iron ore"),
+    (re.compile(r"\bgraphite\b", re.IGNORECASE), "Graphite", "graphite"),
+    (re.compile(r"\bsalt\b", re.IGNORECASE), "Salt", "salt"),
+    (re.compile(r"\bcement\b", re.IGNORECASE), "Cement", "cement"),
+    (re.compile(r"\bpyrite\b", re.IGNORECASE), "Pyrite", "pyrite"),
+)
+
+SITE_COMMODITY_FALLBACKS: tuple[tuple[re.Pattern[str], str, str], ...] = (
+    (
+        re.compile(
+            r"namdeb|debmarine|beach and marine|diamond fields|sakawe|ocean diamond|sperrgebiet",
+            re.IGNORECASE,
+        ),
+        "Diamond",
+        "carats",
+    ),
+    (
+        re.compile(r"rossing|uranium|langer heinrich|swakop", re.IGNORECASE),
+        "Uranium",
+        "uranium oxide",
+    ),
+    (re.compile(r"navachab|b2gold", re.IGNORECASE), "Gold", "gold"),
+    (
+        re.compile(r"dundee|tsumeb|weatherly|kombat|otjihase|matchless|tschudi|khusib", re.IGNORECASE),
+        "Copper",
+        "copper",
+    ),
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -86,7 +140,8 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Optional JSON file mapping site labels to site metadata. When "
             "provided, the importer also writes site_facts and projects rows into "
-            "site_water_metrics or site_commodity_metrics."
+            "site_water_metrics or site_commodity_metrics. When omitted for the "
+            "bundled Chamber CSV, the bundled site map is used automatically."
         ),
     )
     parser.add_argument(
@@ -113,6 +168,10 @@ def normalize_text(value: str) -> str:
 def slugify_key(value: str) -> str:
     normalized = normalize_text(value).lower()
     return re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+
+
+def strip_footnote_markers(value: str) -> str:
+    return normalize_text(re.sub(r"\*+$", "", value))
 
 
 def split_label_and_unit(label: str) -> tuple[str, str | None]:
@@ -243,273 +302,245 @@ def parse_series_rows(rows: list[list[str]]) -> tuple[list[int], list[dict[str, 
     return years, series_rows, metadata
 
 
-class SupabaseRestClient:
+def infer_commodity_from_sources(*sources: str | None) -> tuple[str, str] | None:
+    haystack = " ".join(normalize_text(source) for source in sources if source).strip()
+    if not haystack:
+        return None
+
+    for pattern, commodity_name, ore_type in COMMODITY_PATTERNS:
+        if pattern.search(haystack):
+            return commodity_name, ore_type
+
+    return None
+
+
+def infer_commodity_from_site(*sources: str | None) -> tuple[str, str] | None:
+    haystack = " ".join(normalize_text(source) for source in sources if source).strip()
+    if not haystack:
+        return None
+
+    for pattern, commodity_name, ore_type in SITE_COMMODITY_FALLBACKS:
+        if pattern.search(haystack):
+            return commodity_name, ore_type
+
+    return None
+
+
+def classify_series_row(row: dict[str, Any]) -> CommodityResolution:
+    raw_context = row.get("context_label")
+    raw_series_name = row["series_name"]
+    raw_unit = row.get("unit")
+
+    site_label = normalize_text(raw_context or raw_series_name)
+    series_name = strip_footnote_markers(raw_series_name)
+    unit = normalize_text(raw_unit) if raw_unit else None
+
+    lower_sources = " ".join(
+        value.lower()
+        for value in (series_name, unit, row.get("row_label"), raw_context, site_label)
+        if value
+    )
+    water_metric_keys = {
+        "groundwater": "Groundwater",
+        "fresh_water": "Fresh water",
+        "recycled_water": "Recycled water",
+        "total_water": "Total water",
+        "water_use_efficiency": "Water use efficiency",
+    }
+    for water_key, water_label in water_metric_keys.items():
+        if water_key.replace("_", " ") in lower_sources:
+            return CommodityResolution(
+                site_label=site_label,
+                metric_label=water_label,
+                metric_key=water_key,
+                product_label=water_label,
+                table_name="site_water_metrics",
+                unit=unit,
+            )
+
+    top_level_series = raw_context is None
+    default_metric_label = "Reported output"
+    if top_level_series and unit:
+        default_metric_label = strip_footnote_markers(unit)
+    elif not top_level_series:
+        default_metric_label = series_name
+
+    commodity = infer_commodity_from_sources(series_name, unit, row.get("row_label"))
+    if commodity is None:
+        commodity = infer_commodity_from_site(raw_context, site_label)
+    commodity_name = commodity[0] if commodity else None
+    commodity_ore_type = commodity[1] if commodity else None
+
+    return CommodityResolution(
+        site_label=site_label,
+        metric_label=default_metric_label,
+        metric_key=slugify_key(default_metric_label),
+        product_label=series_name if not top_level_series else default_metric_label,
+        table_name="site_commodity_metrics",
+        unit=unit,
+        commodity_name=commodity_name,
+        commodity_ore_type=commodity_ore_type,
+        commodity_scoped=commodity_name is not None,
+    )
+
+
+class SupabaseDataClient:
     def __init__(self, *, target: str) -> None:
-        base_url, service_role_key = resolve_supabase_rest_config(target=target)
-        self.base_url = base_url
-        self.default_headers = {
-            "apikey": service_role_key,
-            "Authorization": f"Bearer {service_role_key}",
-            "Content-Type": "application/json",
-        }
+        supabase_url, service_role_key = resolve_supabase_config(target=target)
+        self.client: Client = create_client(supabase_url, service_role_key)
 
     def close(self) -> None:
         return None
 
-    def _request(
-        self,
-        method: str,
-        path: str,
-        *,
-        params: dict[str, str] | None = None,
-        json_body: dict[str, Any] | list[dict[str, Any]] | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> Any:
-        parsed_base = urlparse(self.base_url)
-        query = ""
-        if params:
-            query = urlencode(params)
-        base_path = parsed_base.path.rstrip("/")
-        url = f"{parsed_base.scheme}://{parsed_base.netloc}{base_path}{path}"
-        if query:
-            url = f"{url}?{query}"
-
-        request_headers = dict(self.default_headers)
-        if headers:
-            request_headers.update(headers)
-
-        data: bytes | None = None
-        if json_body is not None:
-            data = json.dumps(json_body).encode("utf-8")
-
-        request = Request(url, data=data, headers=request_headers, method=method)
+    def _execute(self, operation: str, query: Any) -> list[dict[str, Any]]:
         try:
-            with urlopen(request, timeout=30) as response:
-                payload = response.read().decode("utf-8")
-                if not payload:
-                    return None
-                return json.loads(payload)
-        except HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(
-                f"Supabase request failed ({method} {path}): {exc.code} {body}"
-            ) from exc
+            response = query.execute()
+        except Exception as exc:
+            raise RuntimeError(f"Supabase query failed ({operation}): {exc}") from exc
+        return list(response.data)
 
-    def get_document_by_source_url(self, source_url: str) -> dict[str, Any] | None:
-        payload = self._request(
-            "GET",
-            "/documents",
-            params={"source_url": f"eq.{source_url}", "select": "*"},
-        )
+    def _apply_filters(self, query: Any, filters: dict[str, Any]) -> Any:
+        for column, value in filters.items():
+            if value is None:
+                query = query.is_(column, "null")
+            else:
+                query = query.eq(column, value)
+        return query
+
+    def _select_first(
+        self,
+        table_name: str,
+        *,
+        filters: dict[str, Any],
+        columns: str = "*",
+    ) -> dict[str, Any] | None:
+        query = self.client.table(table_name).select(columns).limit(1)
+        query = self._apply_filters(query, filters)
+        payload = self._execute(f"select from {table_name}", query)
         if not payload:
             return None
         return payload[0]
 
-    def create_document(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/documents",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
+    def _insert_one(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._execute(
+            f"insert into {table_name}",
+            self.client.table(table_name).insert(payload),
         )
+        if not response:
+            raise RuntimeError(f"Supabase insert returned no rows for {table_name}.")
         return response[0]
+
+    def _update(self, table_name: str, *, filters: dict[str, Any], payload: dict[str, Any]) -> None:
+        query = self.client.table(table_name).update(
+            payload,
+            returning=ReturnMethod.minimal,
+        )
+        query = self._apply_filters(query, filters)
+        self._execute(f"update {table_name}", query)
+
+    def _delete(self, table_name: str, *, filters: dict[str, Any]) -> None:
+        query = self.client.table(table_name).delete(returning=ReturnMethod.minimal)
+        query = self._apply_filters(query, filters)
+        self._execute(f"delete from {table_name}", query)
+
+    def get_document_by_source_url(self, source_url: str) -> dict[str, Any] | None:
+        return self._select_first("documents", filters={"source_url": source_url})
+
+    def create_document(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._insert_one("documents", payload)
 
     def patch_document(self, document_id: str, payload: dict[str, Any]) -> None:
-        self._request(
-            "PATCH",
-            "/documents",
-            params={"id": f"eq.{document_id}"},
-            json_body=payload,
-        )
+        self._update("documents", filters={"id": document_id}, payload=payload)
 
     def create_job(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/processing_jobs",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one("processing_jobs", payload)
 
     def patch_job(self, job_id: str, payload: dict[str, Any]) -> None:
-        self._request(
-            "PATCH",
-            "/processing_jobs",
-            params={"id": f"eq.{job_id}"},
-            json_body=payload,
-        )
+        self._update("processing_jobs", filters={"id": job_id}, payload=payload)
 
     def delete_extracted_records(self, document_id: str) -> None:
-        self._request(
-            "DELETE",
-            "/extracted_records",
-            params={"document_id": f"eq.{document_id}"},
-        )
+        self._delete("extracted_records", filters={"document_id": document_id})
 
     def insert_extracted_records(self, payload: list[dict[str, Any]]) -> None:
-        self._request(
-            "POST",
-            "/extracted_records",
-            headers={"Prefer": "return=minimal"},
-            json_body=payload,
+        self._execute(
+            "insert into extracted_records",
+            self.client.table("extracted_records").insert(
+                payload,
+                returning=ReturnMethod.minimal,
+            ),
         )
 
     def get_country_by_name(self, name: str) -> dict[str, Any] | None:
-        payload = self._request(
-            "GET",
-            "/countries",
-            params={"name": f"eq.{name}", "select": "*"},
-        )
-        if not payload:
-            return None
-        return payload[0]
+        return self._select_first("countries", filters={"name": name})
 
     def create_country(self, name: str) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/countries",
-            headers={"Prefer": "return=representation"},
-            json_body={"name": name},
+        return self._insert_one("countries", {"name": name})
+
+    def get_commodity_by_name(self, name: str) -> dict[str, Any] | None:
+        return self._select_first("commodities", filters={"name": name})
+
+    def create_commodity(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._insert_one("commodities", payload)
+
+    def get_site_commodity(self, site_id: int, commodity_id: int) -> dict[str, Any] | None:
+        return self._select_first(
+            "site_commodities",
+            filters={"site_id": site_id, "commodity_id": commodity_id},
         )
-        return response[0]
+
+    def create_site_commodity(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._insert_one("site_commodities", payload)
 
     def get_site_by_name(self, name: str) -> dict[str, Any] | None:
-        payload = self._request(
-            "GET",
-            "/sites",
-            params={"name": f"eq.{name}", "select": "*"},
-        )
-        if not payload:
-            return None
-        return payload[0]
+        return self._select_first("sites", filters={"name": name})
 
     def create_site(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/sites",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one("sites", payload)
 
     def patch_site(self, site_id: int, payload: dict[str, Any]) -> None:
-        self._request(
-            "PATCH",
-            "/sites",
-            params={"id": f"eq.{site_id}"},
-            json_body=payload,
-        )
+        self._update("sites", filters={"id": site_id}, payload=payload)
 
     def get_site_data(self, site_id: int) -> dict[str, Any] | None:
-        payload = self._request(
-            "GET",
-            "/site_data",
-            params={"site_id": f"eq.{site_id}", "select": "*"},
-        )
-        if not payload:
-            return None
-        return payload[0]
+        return self._select_first("site_data", filters={"site_id": site_id})
 
     def create_site_data(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/site_data",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one("site_data", payload)
 
     def patch_site_data(self, site_id: int, payload: dict[str, Any]) -> None:
-        self._request(
-            "PATCH",
-            "/site_data",
-            params={"site_id": f"eq.{site_id}"},
-            json_body=payload,
-        )
+        self._update("site_data", filters={"site_id": site_id}, payload=payload)
 
     def get_subtype_row(self, table_name: str, site_id: int) -> dict[str, Any] | None:
-        payload = self._request(
-            "GET",
-            f"/{table_name}",
-            params={"site_id": f"eq.{site_id}", "select": "*"},
-        )
-        if not payload:
-            return None
-        return payload[0]
+        return self._select_first(table_name, filters={"site_id": site_id})
 
     def create_subtype_row(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            f"/{table_name}",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one(table_name, payload)
 
     def patch_subtype_row(self, table_name: str, site_id: int, payload: dict[str, Any]) -> None:
-        self._request(
-            "PATCH",
-            f"/{table_name}",
-            params={"site_id": f"eq.{site_id}"},
-            json_body=payload,
-        )
+        self._update(table_name, filters={"site_id": site_id}, payload=payload)
 
     def get_definition_by_key(self, table_name: str, metric_key: str) -> dict[str, Any] | None:
-        payload = self._request(
-            "GET",
-            f"/{table_name}",
-            params={"metric_key": f"eq.{metric_key}", "select": "*"},
-        )
-        if not payload:
-            return None
-        return payload[0]
+        return self._select_first(table_name, filters={"metric_key": metric_key})
 
     def create_definition(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            f"/{table_name}",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one(table_name, payload)
 
     def create_site_fact(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/site_facts",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one("site_facts", payload)
 
     def list_site_facts_by_document(self, document_id: int) -> list[dict[str, Any]]:
-        payload = self._request(
-            "GET",
-            "/site_facts",
-            params={"document_id": f"eq.{document_id}", "select": "id"},
+        return self._execute(
+            "select ids from site_facts",
+            self.client.table("site_facts").select("id").eq("document_id", document_id),
         )
-        return payload or []
 
     def delete_site_facts_by_document(self, document_id: int) -> None:
-        self._request(
-            "DELETE",
-            "/site_facts",
-            params={"document_id": f"eq.{document_id}"},
-        )
+        self._delete("site_facts", filters={"document_id": document_id})
 
     def delete_site_water_metrics_by_fact_id(self, fact_id: str) -> None:
-        self._request(
-            "DELETE",
-            "/site_water_metrics",
-            params={"fact_id": f"eq.{fact_id}"},
-        )
+        self._delete("site_water_metrics", filters={"fact_id": fact_id})
 
     def delete_site_commodity_metrics_by_fact_id(self, fact_id: str) -> None:
-        self._request(
-            "DELETE",
-            "/site_commodity_metrics",
-            params={"fact_id": f"eq.{fact_id}"},
-        )
+        self._delete("site_commodity_metrics", filters={"fact_id": fact_id})
 
     def get_metric_row(
         self,
@@ -521,40 +552,21 @@ class SupabaseRestClient:
         commodity_id: int | None = None,
         project_label: str | None = None,
     ) -> dict[str, Any] | None:
-        params = {
-            "site_id": f"eq.{site_id}",
-            "definition_id": f"eq.{definition_id}",
-            "yr": f"eq.{yr}",
-            "select": "*",
+        filters: dict[str, Any] = {
+            "site_id": site_id,
+            "definition_id": definition_id,
+            "yr": yr,
+            "project_label": project_label,
         }
-        params["project_label"] = (
-            f"eq.{project_label}" if project_label is not None else "is.null"
-        )
         if table_name == "site_commodity_metrics":
-            params["commodity_id"] = (
-                f"eq.{commodity_id}" if commodity_id is not None else "is.null"
-            )
-        payload = self._request("GET", f"/{table_name}", params=params)
-        if not payload:
-            return None
-        return payload[0]
+            filters["commodity_id"] = commodity_id
+        return self._select_first(table_name, filters=filters)
 
     def create_metric_row(self, table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            f"/{table_name}",
-            headers={"Prefer": "return=representation"},
-            json_body=payload,
-        )
-        return response[0]
+        return self._insert_one(table_name, payload)
 
     def patch_metric_row(self, table_name: str, row_id: int, payload: dict[str, Any]) -> None:
-        self._request(
-            "PATCH",
-            f"/{table_name}",
-            params={"id": f"eq.{row_id}"},
-            json_body=payload,
-        )
+        self._update(table_name, filters={"id": row_id}, payload=payload)
 
 
 def build_document_notes(metadata: DatasetMetadata, csv_path: Path) -> str:
@@ -654,7 +666,20 @@ def extract_json_object(raw_output: str) -> dict[str, Any]:
     return json.loads(raw_output[json_start:])
 
 
-def resolve_local_supabase_rest_config() -> tuple[str, str]:
+def normalize_supabase_project_url(raw_url: str) -> str:
+    parsed = urlparse(raw_url)
+    if parsed.netloc == "supabase.com":
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if len(path_parts) >= 3 and path_parts[:2] == ["dashboard", "project"]:
+            project_ref = path_parts[2]
+            return f"https://{project_ref}.supabase.co"
+
+    if raw_url.rstrip("/").endswith("/rest/v1"):
+        return raw_url[: -len("/rest/v1")]
+    return raw_url.rstrip("/")
+
+
+def resolve_local_supabase_config() -> tuple[str, str]:
     repo_root = resolve_repo_root()
     npx_executable = shutil.which("npx") or shutil.which("npx.cmd")
     if npx_executable is None:
@@ -669,16 +694,18 @@ def resolve_local_supabase_rest_config() -> tuple[str, str]:
         check=True,
     )
     payload = extract_json_object(result.stdout)
-    rest_url = payload.get("REST_URL")
+    supabase_url = payload.get("API_URL") or payload.get("SUPABASE_URL") or payload.get(
+        "REST_URL"
+    )
     service_role_key = payload.get("SERVICE_ROLE_KEY")
-    if not rest_url or not service_role_key:
+    if not supabase_url or not service_role_key:
         raise RuntimeError(
-            "Local Supabase status did not return REST_URL and SERVICE_ROLE_KEY."
+            "Local Supabase status did not return a Supabase URL and SERVICE_ROLE_KEY."
         )
-    return str(rest_url), str(service_role_key)
+    return normalize_supabase_project_url(str(supabase_url)), str(service_role_key)
 
 
-def resolve_env_supabase_rest_config() -> tuple[str, str]:
+def resolve_env_supabase_config() -> tuple[str, str]:
     repo_root = resolve_repo_root()
     load_dotenv(repo_root / ".env")
 
@@ -691,21 +718,13 @@ def resolve_env_supabase_rest_config() -> tuple[str, str]:
             "environment or the repo root .env file."
         )
 
-    parsed = urlparse(supabase_url)
-    if parsed.netloc == "supabase.com":
-        path_parts = [part for part in parsed.path.split("/") if part]
-        if len(path_parts) >= 3 and path_parts[:2] == ["dashboard", "project"]:
-            project_ref = path_parts[2]
-            rest_url = f"https://{project_ref}.supabase.co/rest/v1"
-            return rest_url, service_role_key
-
-    return f"{supabase_url.rstrip('/')}/rest/v1", service_role_key
+    return normalize_supabase_project_url(supabase_url), service_role_key
 
 
-def resolve_supabase_rest_config(*, target: str) -> tuple[str, str]:
+def resolve_supabase_config(*, target: str) -> tuple[str, str]:
     if target == "local":
-        return resolve_local_supabase_rest_config()
-    return resolve_env_supabase_rest_config()
+        return resolve_local_supabase_config()
+    return resolve_env_supabase_config()
 
 
 def load_site_seeds(site_map_path: Path | None) -> dict[str, SiteSeed]:
@@ -747,33 +766,21 @@ def load_site_seeds(site_map_path: Path | None) -> dict[str, SiteSeed]:
     return seeds
 
 
-def classify_series_row(row: dict[str, Any]) -> tuple[str, str, str]:
-    context_label = row.get("context_label")
-    if context_label:
-        site_label = normalize_text(context_label)
-        metric_label = row["series_name"]
-    else:
-        site_label = normalize_text(row["series_name"])
-        metric_label = "Reported output"
+def resolve_site_map_path(args: argparse.Namespace) -> Path | None:
+    if args.site_map_path is not None:
+        return args.site_map_path
 
-    metric_key = slugify_key(metric_label)
-    water_metric_keys = {
-        "groundwater",
-        "fresh_water",
-        "recycled_water",
-        "total_water",
-        "water_use_efficiency",
-    }
-    table_name = (
-        "site_water_metrics"
-        if metric_key in water_metric_keys
-        else "site_commodity_metrics"
+    default_csv = Path(__file__).with_name(
+        "Output-by-Chamber-Members-1990-2023(Output by Mine).csv"
     )
-    return site_label, metric_key, table_name
+    default_site_map = Path(__file__).with_name(DEFAULT_SITE_MAP_NAME)
+    if args.csv_path.resolve() == default_csv.resolve() and default_site_map.exists():
+        return default_site_map
+    return None
 
 
 def ensure_country(
-    client: SupabaseRestClient, country_name: str | None
+    client: SupabaseDataClient, country_name: str | None
 ) -> int | None:
     if country_name is None:
         return None
@@ -784,7 +791,7 @@ def ensure_country(
 
 
 def ensure_site(
-    client: SupabaseRestClient,
+    client: SupabaseDataClient,
     *,
     site_label: str,
     site_seed: SiteSeed,
@@ -846,12 +853,13 @@ def ensure_site(
 
 
 def ensure_metric_definition(
-    client: SupabaseRestClient,
+    client: SupabaseDataClient,
     *,
     table_name: str,
     metric_key: str,
     label: str,
     unit: str | None,
+    commodity_scoped: bool = False,
 ) -> int:
     definitions_table = (
         "site_water_metric_definitions"
@@ -869,13 +877,37 @@ def ensure_metric_definition(
         "sort_order": 1000,
     }
     if definitions_table == "site_commodity_metric_definitions":
-        payload["commodity_scoped"] = False
+        payload["commodity_scoped"] = commodity_scoped
     created = client.create_definition(definitions_table, payload)
     return int(created["id"])
 
 
+def ensure_commodity(
+    client: SupabaseDataClient,
+    *,
+    name: str,
+    ore_type: str,
+) -> int:
+    existing = client.get_commodity_by_name(name)
+    if existing is not None:
+        return int(existing["id"])
+    created = client.create_commodity({"name": name, "ore_type": ore_type})
+    return int(created["id"])
+
+
+def ensure_site_commodity(
+    client: SupabaseDataClient,
+    *,
+    site_id: int,
+    commodity_id: int,
+) -> None:
+    existing = client.get_site_commodity(site_id, commodity_id)
+    if existing is None:
+        client.create_site_commodity({"site_id": site_id, "commodity_id": commodity_id})
+
+
 def project_rows_to_site_facts(
-    client: SupabaseRestClient,
+    client: SupabaseDataClient,
     *,
     document_id: int,
     dataset_name: str,
@@ -898,19 +930,29 @@ def project_rows_to_site_facts(
     imported_at = utc_now()
 
     for row in series_rows:
-        site_label, metric_key, table_name = classify_series_row(row)
-        site_seed = site_seeds.get(site_label)
+        classification = classify_series_row(row)
+        site_seed = site_seeds.get(classification.site_label)
         if site_seed is None:
             skipped_rows += 1
             continue
 
-        site_id = ensure_site(client, site_label=site_label, site_seed=site_seed)
+        site_id = ensure_site(client, site_label=classification.site_label, site_seed=site_seed)
+        commodity_id: int | None = None
+        if classification.commodity_name and classification.commodity_ore_type:
+            commodity_id = ensure_commodity(
+                client,
+                name=classification.commodity_name,
+                ore_type=classification.commodity_ore_type,
+            )
+            ensure_site_commodity(client, site_id=site_id, commodity_id=commodity_id)
+
         definition_id = ensure_metric_definition(
             client,
-            table_name=table_name,
-            metric_key=metric_key,
-            label=row["series_name"] if row.get("context_label") else "Reported output",
-            unit=row["unit"],
+            table_name=classification.table_name,
+            metric_key=classification.metric_key,
+            label=classification.metric_label,
+            unit=classification.unit,
+            commodity_scoped=classification.commodity_scoped,
         )
         for cell in row["values_by_year"]:
             if cell["numeric_value"] is None:
@@ -924,6 +966,10 @@ def project_rows_to_site_facts(
                 "row_label": row["row_label"],
                 "context_label": row["context_label"],
                 "source_line_number": row["line_number"],
+                "resolved_site_label": classification.site_label,
+                "resolved_metric_label": classification.metric_label,
+                "resolved_product_label": classification.product_label,
+                "resolved_commodity_name": classification.commodity_name,
                 "raw_value": cell["raw_value"],
                 "note": cell["note"],
             }
@@ -931,13 +977,14 @@ def project_rows_to_site_facts(
                 {
                     "site_id": site_id,
                     "document_id": document_id,
-                    "field_key": metric_key,
-                    "table_target": table_name,
+                    "commodity_id": commodity_id,
+                    "field_key": classification.metric_key,
+                    "table_target": classification.table_name,
                     "subtype_scope": site_seed.site_type,
                     "value_type": "numeric",
                     "value_numeric": cell["numeric_value"],
                     "effective_year": cell["year"],
-                    "unit": row["unit"],
+                    "unit": classification.unit,
                     "project_label": row["context_label"],
                     "status": "accepted",
                     "provenance": provenance,
@@ -948,27 +995,34 @@ def project_rows_to_site_facts(
                 "definition_id": definition_id,
                 "yr": cell["year"],
                 "value_numeric": cell["numeric_value"],
-                "unit": row["unit"] or "",
+                "unit": classification.unit or "",
                 "project_label": row["context_label"],
                 "fact_id": fact["id"],
             }
+            if classification.table_name == "site_commodity_metrics":
+                metric_payload["commodity_id"] = commodity_id
             existing_metric = client.get_metric_row(
-                table_name,
+                classification.table_name,
                 site_id=site_id,
                 definition_id=definition_id,
                 yr=int(cell["year"]),
+                commodity_id=commodity_id,
                 project_label=row["context_label"],
             )
             if existing_metric is None:
-                client.create_metric_row(table_name, metric_payload)
+                client.create_metric_row(classification.table_name, metric_payload)
             else:
-                client.patch_metric_row(table_name, int(existing_metric["id"]), metric_payload)
+                client.patch_metric_row(
+                    classification.table_name,
+                    int(existing_metric["id"]),
+                    metric_payload,
+                )
             projected_rows += 1
     return {"projected_rows": projected_rows, "skipped_rows": skipped_rows}
 
 
 def upsert_dataset_document(
-    client: SupabaseRestClient,
+    client: SupabaseDataClient,
     *,
     source_url: str,
     title: str,
@@ -1002,12 +1056,20 @@ def run_import(args: argparse.Namespace) -> None:
     rows = load_csv_rows(args.csv_path)
     years, series_rows, metadata = parse_series_rows(rows)
     notes = build_document_notes(metadata, args.csv_path)
-    site_seeds = load_site_seeds(args.site_map_path)
+    site_map_path = resolve_site_map_path(args)
+    site_seeds = load_site_seeds(site_map_path)
 
     print(
         f"Parsed {len(series_rows)} series rows covering {years[0]}-{years[-1]} "
         f"from {args.csv_path.name}."
     )
+    if site_map_path is None:
+        print(
+            "No site map configured; importer will only write documents, "
+            "processing_jobs, and extracted_records."
+        )
+    else:
+        print(f"Using site map: {site_map_path.name}.")
     if args.dry_run:
         preview = series_rows[:3]
         for item in preview:
@@ -1018,7 +1080,7 @@ def run_import(args: argparse.Namespace) -> None:
         print("Dry run complete. No changes written to Supabase.")
         return
 
-    client = SupabaseRestClient(target=args.target)
+    client = SupabaseDataClient(target=args.target)
     job_id: str | None = None
     document_id: str | None = None
 
