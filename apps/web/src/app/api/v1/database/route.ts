@@ -8,6 +8,7 @@ import type {
   DatabaseRow,
 } from "@/app/database/database-types";
 import { DATABASE_METRIC_YEARS } from "@/app/database/database-types";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +20,7 @@ const EMPTY_TABLES: Record<DatabaseCategory, DatabaseRow[]> = {
 };
 
 function createSupabaseRouteClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    throw new Error("Missing public Supabase environment variables.");
-  }
-
-  return createClient(url, anonKey, {
+  return createClient(getSupabaseUrl(), getSupabaseAnonKey(), {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

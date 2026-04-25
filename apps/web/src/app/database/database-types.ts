@@ -6,7 +6,7 @@ export const DATABASE_DRAWER_LINKS = [
   { label: "Pricing", href: "/pricing" },
   { label: "About", href: "/about" },
   { label: "Profile", href: "/profile" },
-  { label: "Login", href: "/login" },
+  { label: "Login", href: "/signin" },
 ] as const;
 
 export const DATABASE_CATEGORY_TABS = [
