@@ -1,10 +1,14 @@
 "use client";
 
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import {
   DataGrid,
@@ -16,23 +20,50 @@ import {
   useGridApiRef,
   type GridColDef,
 } from "@mui/x-data-grid";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   DATABASE_METRIC_YEARS,
-  DATABASE_CATEGORY_TABS,
+  type DatabaseCellValue,
   type DatabaseCategory,
+  type DatabaseColumnMeta,
+  type DatabaseDirtyCell,
   type DatabaseRow,
   type DatabaseStatus,
 } from "@/app/database/database-types";
 
 type DatabaseGridProps = {
+  categories: DatabaseCategory[];
   activeCategory: DatabaseCategory;
   onCategoryChange: (category: DatabaseCategory) => void;
   rows: DatabaseRow[];
   isLoading: boolean;
+  isAdmin: boolean;
+  columnsMeta: DatabaseColumnMeta[];
+  canAddColumns: boolean;
+  canHideColumns: boolean;
+  onOpenAddColumn: () => void;
+  onHideColumn: (column: DatabaseColumnMeta) => void;
+  onCellChange: (change: DatabaseDirtyCell) => void;
   onExportHandlersChange: (handlers: { exportCsv: () => void; exportPrint: () => void }) => void;
 };
+
+const EMPTY_COLUMNS: GridColDef<DatabaseRow>[] = [];
+
+function DatabaseToolbar() {
+  return (
+    <GridToolbarContainer sx={{ px: 0.25, pb: 0.75 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: 1 }}>
+        <Stack direction="row" spacing={0.5}>
+          <GridToolbarColumnsButton />
+          <GridToolbarFilterButton />
+          <GridToolbarDensitySelector />
+        </Stack>
+        <GridToolbarQuickFilter debounceMs={300} />
+      </Stack>
+    </GridToolbarContainer>
+  );
+}
 
 function EmptyOverlay({ category }: { category: DatabaseCategory }) {
   return (
@@ -105,14 +136,127 @@ function buildMetricColumns(
   ];
 }
 
+function hasChanged(left: DatabaseCellValue, right: DatabaseCellValue) {
+  return String(left ?? "") !== String(right ?? "");
+}
+
+function toGridColumn(
+  column: DatabaseColumnMeta,
+  options: {
+    isAdmin: boolean;
+    canHideColumns: boolean;
+    onHideColumn: (column: DatabaseColumnMeta) => void;
+  },
+): GridColDef<DatabaseRow> {
+  const { isAdmin, canHideColumns, onHideColumn } = options;
+  return {
+    field: column.field,
+    headerName: column.headerName,
+    minWidth: column.width ?? 130,
+    flex: column.flex ?? 1,
+    editable: isAdmin && column.editable,
+    type:
+      column.dataType === "boolean"
+        ? "boolean"
+        : column.dataType === "integer" || column.dataType === "numeric"
+          ? "number"
+          : column.dataType === "date"
+            ? "string"
+            : "string",
+    renderHeader: () => (
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.5}
+        sx={{
+          width: 1,
+          minWidth: 0,
+          "& .admin-hide-column": {
+            opacity: 0,
+            transition: "opacity 120ms ease",
+          },
+          "&:hover .admin-hide-column": {
+            opacity: 1,
+          },
+        }}
+      >
+        <Typography
+          component="span"
+          sx={{
+            color: "common.white",
+            fontWeight: 800,
+            fontSize: "inherit",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {column.headerName}
+        </Typography>
+        {isAdmin && canHideColumns && column.hideable ? (
+          <Tooltip title={`Hide ${column.headerName} for all users`}>
+            <IconButton
+              aria-label={`Hide ${column.headerName} column`}
+              className="admin-hide-column"
+              size="small"
+              onClick={(event) => {
+                event.stopPropagation();
+                onHideColumn(column);
+              }}
+              sx={{
+                color: "common.white",
+                bgcolor: "error.main",
+                borderRadius: "50%",
+                width: 20,
+                height: 20,
+                boxShadow: 1,
+                "&:hover, &.Mui-focusVisible": {
+                  bgcolor: "error.dark !important",
+                },
+              }}
+            >
+              <CloseRoundedIcon sx={{ fontSize: "0.95rem" }} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+      </Stack>
+    ),
+    renderCell:
+      column.field === "status"
+        ? (params) => {
+            const item = statusChip(String(params.value) as DatabaseStatus);
+            return (
+              <Chip
+                label={item.label}
+                size="small"
+                sx={{ ...item.sx, fontWeight: 600, fontSize: "0.65rem", height: 20 }}
+              />
+            );
+          }
+        : undefined,
+  };
+}
+
 export default function DatabaseGrid({
+  categories,
   activeCategory,
   onCategoryChange,
   rows,
   isLoading,
+  isAdmin,
+  columnsMeta,
+  canAddColumns,
+  canHideColumns,
+  onOpenAddColumn,
+  onHideColumn,
+  onCellChange,
   onExportHandlersChange,
 }: DatabaseGridProps) {
   const apiRef = useGridApiRef();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     onExportHandlersChange({
@@ -121,23 +265,8 @@ export default function DatabaseGrid({
     });
   }, [apiRef, onExportHandlersChange]);
 
-  function DatabaseToolbar() {
-    return (
-      <GridToolbarContainer sx={{ px: 0.25, pb: 0.75 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: 1 }}>
-          <Stack direction="row" spacing={0.5}>
-            <GridToolbarColumnsButton />
-            <GridToolbarFilterButton />
-            <GridToolbarDensitySelector />
-          </Stack>
-          <GridToolbarQuickFilter debounceMs={300} />
-        </Stack>
-      </GridToolbarContainer>
-    );
-  }
-
   const tableConfigs = useMemo<
-    Record<DatabaseCategory, { columns: GridColDef<DatabaseRow>[] }>
+    Partial<Record<DatabaseCategory, { columns: GridColDef<DatabaseRow>[] }>>
   >(
     () => ({
       Mines: {
@@ -192,16 +321,109 @@ export default function DatabaseGrid({
   );
 
   const safeActiveCategory = activeCategory;
-  const tabValue = DATABASE_CATEGORY_TABS.indexOf(safeActiveCategory);
+  const tabValue = categories.indexOf(safeActiveCategory);
   const activeTable = tableConfigs[safeActiveCategory];
+  const fallbackColumns = activeTable?.columns ?? EMPTY_COLUMNS;
+  const activeColumns = useMemo(() => {
+    const baseColumns =
+      columnsMeta.length > 0
+        ? columnsMeta
+            .filter((column) => column.visible)
+            .map((column) =>
+              toGridColumn(column, {
+                isAdmin,
+                canHideColumns,
+                onHideColumn,
+              }),
+            )
+        : fallbackColumns;
+
+    if (!isAdmin || !canAddColumns) {
+      return baseColumns;
+    }
+
+    return [
+      ...baseColumns,
+      {
+        field: "__admin_add_column",
+        headerName: "",
+        minWidth: 58,
+        width: 58,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderHeader: () => (
+          <Tooltip title="Add or restore a column">
+            <IconButton
+              aria-label="Add or restore a column"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenAddColumn();
+              }}
+              sx={{
+                color: "common.white",
+                border: "1px solid",
+                borderColor: "rgba(255,255,255,0.58)",
+                width: 26,
+                height: 26,
+              }}
+            >
+              <AddRoundedIcon sx={{ fontSize: "1rem" }} />
+            </IconButton>
+          </Tooltip>
+        ),
+        renderCell: () => null,
+      } satisfies GridColDef<DatabaseRow>,
+    ];
+  }, [
+    canAddColumns,
+    canHideColumns,
+    columnsMeta,
+    fallbackColumns,
+    isAdmin,
+    onHideColumn,
+    onOpenAddColumn,
+  ]);
+
+  function processRowUpdate(updatedRow: DatabaseRow, originalRow: DatabaseRow) {
+    columnsMeta
+      .filter((column) => column.editable)
+      .forEach((column) => {
+        if (!hasChanged(updatedRow[column.field], originalRow[column.field])) {
+          return;
+        }
+        onCellChange({
+          category: safeActiveCategory,
+          rowId: Number(updatedRow.id),
+          field: column.field,
+          value: updatedRow[column.field],
+          originalValue: originalRow[column.field],
+          metricRowId:
+            typeof (originalRow.__metricIds as Record<string, unknown> | undefined)?.[
+              column.field
+            ] === "number"
+              ? ((originalRow.__metricIds as Record<string, number>)[column.field])
+              : undefined,
+        });
+      });
+    return updatedRow;
+  }
+
+  const slots = useMemo(
+    () => ({
+      toolbar: DatabaseToolbar,
+      noRowsOverlay: () => <EmptyOverlay category={safeActiveCategory} />,
+    }),
+    [safeActiveCategory],
+  );
 
   return (
     <Stack spacing={2}>
       <Tabs
-        value={tabValue}
+        value={tabValue < 0 ? false : tabValue}
         variant="fullWidth"
         onChange={(_event, index) => {
-          const nextCategory = DATABASE_CATEGORY_TABS[index];
+          const nextCategory = categories[index];
           if (nextCategory) {
             onCategoryChange(nextCategory);
           }
@@ -223,17 +445,20 @@ export default function DatabaseGrid({
           "& .MuiTabs-indicator": { bgcolor: "#007BE0", height: 3 },
         }}
       >
-        {DATABASE_CATEGORY_TABS.map((tabLabel) => (
+        {categories.map((tabLabel) => (
           <Tab key={tabLabel} label={tabLabel} />
         ))}
       </Tabs>
 
       <Box sx={{ width: "100%", minHeight: 460 }}>
-        <DataGrid
-          apiRef={apiRef}
-          rows={rows}
-          columns={activeTable.columns}
+        {hasMounted ? (
+          <DataGrid
+            apiRef={apiRef}
+            rows={rows}
+            columns={activeColumns}
           loading={isLoading}
+          processRowUpdate={processRowUpdate}
+          onProcessRowUpdateError={() => undefined}
           columnHeaderHeight={44}
           pagination
           pageSizeOptions={[20, 50, 100]}
@@ -248,10 +473,7 @@ export default function DatabaseGrid({
           disableRowSelectionOnClick
           hideFooterSelectedRowCount
           rowHeight={40}
-          slots={{
-            toolbar: DatabaseToolbar,
-            noRowsOverlay: () => <EmptyOverlay category={safeActiveCategory} />,
-          }}
+          slots={slots}
           showToolbar
           sx={{
             border: "none",
@@ -284,11 +506,25 @@ export default function DatabaseGrid({
               borderRadius: 0,
               bgcolor: "transparent",
             },
-            "& .MuiDataGrid-columnHeader .MuiIconButton-root:hover": {
+            "& .MuiDataGrid-columnHeader .MuiIconButton-root:not(.admin-hide-column):hover": {
               bgcolor: "transparent !important",
             },
-            "& .MuiDataGrid-columnHeader .MuiIconButton-root.Mui-focusVisible": {
+            "& .MuiDataGrid-columnHeader .MuiIconButton-root:not(.admin-hide-column).Mui-focusVisible": {
               bgcolor: "transparent !important",
+              outline: "none",
+            },
+            "& .MuiDataGrid-columnHeader .MuiIconButton-root.admin-hide-column": {
+              color: "common.white",
+              bgcolor: "error.main",
+              borderRadius: "50%",
+              width: 20,
+              height: 20,
+            },
+            "& .MuiDataGrid-columnHeader .MuiIconButton-root.admin-hide-column:hover": {
+              bgcolor: "error.dark !important",
+            },
+            "& .MuiDataGrid-columnHeader .MuiIconButton-root.admin-hide-column.Mui-focusVisible": {
+              bgcolor: "error.dark !important",
               outline: "none",
             },
             "& .MuiDataGrid-columnHeader .MuiTouchRipple-root": {
@@ -308,6 +544,15 @@ export default function DatabaseGrid({
             "& .MuiDataGrid-main": {
               fontSize: "0.85rem",
             },
+            "& .MuiDataGrid-cell--editing": {
+              bgcolor: "common.white",
+              boxShadow: 2,
+            },
+            "& .MuiDataGrid-cell--editing .MuiInputBase-root, & .MuiDataGrid-cell--editing .MuiInputBase-input":
+              {
+                fontSize: "0.85rem",
+                lineHeight: 1.3,
+              },
             "& .MuiDataGrid-toolbarContainer": {
               px: 0.25,
               pb: 0.75,
@@ -346,7 +591,10 @@ export default function DatabaseGrid({
               p: 0.5,
             },
           }}
-        />
+          />
+        ) : (
+          <Box sx={{ minHeight: 460, bgcolor: "background.200" }} />
+        )}
       </Box>
     </Stack>
   );
