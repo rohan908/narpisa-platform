@@ -1,9 +1,9 @@
 from typing import Annotated, Any, cast
 
 from fastapi import Depends, Header, HTTPException, status
-from gotrue.errors import AuthApiError
 from postgrest.exceptions import APIError
 from supabase import Client, create_client
+from supabase_auth.errors import AuthApiError
 
 from app.core.config import Settings, get_settings
 from app.data.database_admin.models import AdminUser, DirtyCellChange, SaveFailure

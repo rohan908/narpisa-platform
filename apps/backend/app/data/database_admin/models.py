@@ -39,10 +39,7 @@ class SaveRowsRequest(BaseModel):
 
 
 class SaveFailure(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-        ser_json_by_alias=True,  # type: ignore[typeddict-unknown-key]
-    )
+    model_config = ConfigDict(populate_by_name=True)
 
     row_id: int = Field(alias="rowId")
     field: str
