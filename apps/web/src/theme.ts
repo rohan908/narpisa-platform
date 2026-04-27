@@ -244,6 +244,57 @@ const theme = createTheme({
         },
       },
     },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          fontFamily: fontMain,
+          fontSize: "0.95rem",
+          lineHeight: 1.25,
+        },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          fontFamily: fontMain,
+          fontSize: "1.15rem",
+          lineHeight: 1.3,
+          fontWeight: 800,
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: {
+          fontFamily: fontMain,
+          fontSize: "0.95rem",
+          lineHeight: 1.35,
+        },
+        input: {
+          fontFamily: fontMain,
+          fontSize: "0.95rem",
+          lineHeight: 1.35,
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          fontFamily: fontMain,
+          fontSize: "0.9rem",
+          lineHeight: 1.25,
+        },
+      },
+    },
+    MuiFormHelperText: {
+      styleOverrides: {
+        root: {
+          fontFamily: fontMain,
+          fontSize: "0.74rem",
+          lineHeight: 1.3,
+        },
+      },
+    },
     MuiCssBaseline: {
       styleOverrides: {
         html: {
